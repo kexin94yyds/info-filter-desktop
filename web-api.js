@@ -24,7 +24,7 @@ const webAPI = {
   getItems: async () => {
     return await webStorage.get('items') || [];
   },
-  
+
   // 保存新收藏
   saveItem: async (item) => {
     const items = await webAPI.getItems();
@@ -32,7 +32,7 @@ const webAPI = {
     await webStorage.set('items', items);
     return items;
   },
-  
+
   // 删除收藏
   deleteItem: async (id) => {
     const items = await webAPI.getItems();
@@ -40,13 +40,13 @@ const webAPI = {
     await webStorage.set('items', newItems);
     return newItems;
   },
-  
+
   // 更新所有收藏（用于排序）
   updateItems: async (newItems) => {
     await webStorage.set('items', newItems);
     return newItems;
   },
-  
+
   // 切换置顶
   togglePin: async (id) => {
     const items = await webAPI.getItems();
@@ -61,7 +61,7 @@ const webAPI = {
     }
     return items;
   },
-  
+
   // 读取剪贴板（Web API）
   readClipboard: async () => {
     try {
@@ -72,7 +72,7 @@ const webAPI = {
       return '';
     }
   },
-  
+
   // 抓取元数据（需要后端 API）
   fetchMetadata: async (url) => {
     try {
@@ -82,18 +82,18 @@ const webAPI = {
       const response = await fetch(proxyUrl);
       const data = await response.json();
       const html = data.contents;
-      
+
       // 使用 DOMParser 解析 HTML
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      
+
       const title = doc.querySelector('meta[property="og:title"]')?.content ||
-                   doc.querySelector('meta[name="twitter:title"]')?.content ||
-                   doc.querySelector('title')?.textContent || '';
-      
+        doc.querySelector('meta[name="twitter:title"]')?.content ||
+        doc.querySelector('title')?.textContent || '';
+
       const image = doc.querySelector('meta[property="og:image"]')?.content ||
-                   doc.querySelector('meta[name="twitter:image"]')?.content || '';
-      
+        doc.querySelector('meta[name="twitter:image"]')?.content || '';
+
       return { title: title.trim(), image };
     } catch (error) {
       console.error('Fetch metadata error:', error);
@@ -102,37 +102,165 @@ const webAPI = {
   }
 };
 
-// 检测运行环境
-let isElectron = false;
-try {
-  if (typeof require !== 'undefined') {
-    const electron = require('electron');
-    isElectron = !!electron;
+// PeerJS API 适配器 (用于 WebRTC P2P 连接)
+const peerAPI = {
+  conn: null,
+  dataCallback: null,
+
+  init: (peerId) => {
+    return new Promise((resolve, reject) => {
+      const peer = new Peer();
+
+      peer.on('open', () => {
+        console.log('My Peer ID:', peer.id);
+        const conn = peer.connect(peerId);
+
+        conn.on('open', () => {
+          console.log('Connected to Desktop App');
+          peerAPI.conn = conn;
+
+          // 请求初始数据
+          conn.send({ type: 'get-items' });
+
+          resolve(true);
+        });
+
+        conn.on('data', (data) => {
+          console.log('Received data:', data);
+          if (data.type === 'items-updated' && peerAPI.dataCallback) {
+            peerAPI.dataCallback(data.items);
+          }
+        });
+
+        conn.on('error', (err) => {
+          console.error('Connection error:', err);
+          reject(err);
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        reject(err);
+      });
+    });
+  },
+
+  getItems: async () => {
+    if (peerAPI.conn) {
+      peerAPI.conn.send({ type: 'get-items' });
+      // 这里是个异步问题，简单起见我们等待回调更新，或者返回空数组等待推送
+      return [];
+    }
+    return [];
+  },
+
+  saveItem: async (item) => {
+    if (peerAPI.conn) {
+      peerAPI.conn.send({ type: 'save-item', item });
+    }
+    return []; // 乐观更新或等待推送
+  },
+
+  deleteItem: async (id) => {
+    if (peerAPI.conn) {
+      peerAPI.conn.send({ type: 'delete-item', id });
+    }
+    return [];
+  },
+
+  updateItems: async (items) => {
+    if (peerAPI.conn) {
+      peerAPI.conn.send({ type: 'update-items', items });
+    }
+    return items;
+  },
+
+  togglePin: async (id) => {
+    if (peerAPI.conn) {
+      peerAPI.conn.send({ type: 'toggle-pin', id });
+    }
+    return [];
+  },
+
+  readClipboard: async () => {
+    try {
+      return await navigator.clipboard.readText();
+    } catch (e) {
+      return '';
+    }
+  },
+
+  fetchMetadata: async (url) => {
+    // 可以请求桌面端帮忙抓取，解决跨域问题
+    return { title: '', image: '' };
+  },
+
+  subscribe: (callback) => {
+    peerAPI.dataCallback = callback;
   }
-} catch (e) {
-  isElectron = false;
-}
+};
 
 // 导出适配的 API
-if (isElectron) {
-  // Electron 环境，使用原有 IPC
+(async function initAPI() {
+  let isElectron = false;
   try {
-    const { ipcRenderer } = require('electron');
-    window.webAPI = {
-      getItems: () => ipcRenderer.invoke('get-items'),
-      saveItem: (item) => ipcRenderer.invoke('save-item', item),
-      deleteItem: (id) => ipcRenderer.invoke('delete-item', id),
-      updateItems: (items) => ipcRenderer.invoke('update-items', items),
-      togglePin: (id) => ipcRenderer.invoke('toggle-pin', id),
-      readClipboard: () => ipcRenderer.invoke('read-clipboard'),
-      fetchMetadata: (url) => ipcRenderer.invoke('fetch-metadata', url)
-    };
+    if (typeof require !== 'undefined') {
+      const electron = require('electron');
+      isElectron = !!electron;
+    }
   } catch (e) {
-    // 降级到 Web API
-    window.webAPI = webAPI;
+    isElectron = false;
   }
-} else {
-  // Web 环境
-  window.webAPI = webAPI;
-}
+
+  if (isElectron) {
+    // Electron 环境
+    try {
+      const { ipcRenderer } = require('electron');
+      window.webAPI = {
+        getItems: () => ipcRenderer.invoke('get-items'),
+        saveItem: (item) => ipcRenderer.invoke('save-item', item),
+        deleteItem: (id) => ipcRenderer.invoke('delete-item', id),
+        updateItems: (items) => ipcRenderer.invoke('update-items', items),
+        togglePin: (id) => ipcRenderer.invoke('toggle-pin', id),
+        readClipboard: () => ipcRenderer.invoke('read-clipboard'),
+        fetchMetadata: (url) => ipcRenderer.invoke('fetch-metadata', url),
+        getMobileConnectInfo: () => ipcRenderer.invoke('get-mobile-connect-info'),
+        subscribe: (callback) => {
+          ipcRenderer.on('refresh-items', async () => {
+            const items = await ipcRenderer.invoke('get-items');
+            callback(items);
+          });
+        }
+      };
+    } catch (e) {
+      window.webAPI = webAPI;
+    }
+  } else {
+    // Web 环境
+    const urlParams = new URLSearchParams(window.location.search);
+    const peerId = urlParams.get('peer');
+
+    if (peerId) {
+      console.log('Connecting via PeerJS to:', peerId);
+      window.webAPI = peerAPI;
+      peerAPI.init(peerId).catch(err => {
+        console.error('Peer init failed:', err);
+        alert('连接失败，请检查 ID 是否正确');
+      });
+    } else {
+      // 默认本地模式
+      console.log('Running in Standalone Web Mode');
+      window.webAPI = {
+        ...webAPI,
+        subscribe: (callback) => {
+          window.addEventListener('storage', (e) => {
+            if (e.key === 'items') {
+              callback(JSON.parse(e.newValue));
+            }
+          });
+        }
+      };
+    }
+  }
+})();
 

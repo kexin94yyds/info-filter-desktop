@@ -127,7 +127,11 @@
         <button class="filter-btn" data-filter="YouTube">YouTube</button>
         <button class="filter-btn" data-filter="Web">网页</button>
       </div>
-      <!-- 移除了手动添加按钮，引导使用快捷键 -->
+      <div class="actions" style="display: flex; gap: 8px;">
+        <button class="add-btn" id="exportBtn" style="background: #4b5563;">导出</button>
+        <button class="add-btn" id="importBtn" style="background: #4b5563;">导入</button>
+        <input type="file" id="importFile" style="display: none" accept=".json">
+      </div>
     </header>
 
     <div id="grid" class="grid">

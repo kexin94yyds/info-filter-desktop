@@ -1,13 +1,145 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, shell, clipboard, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, shell, clipboard, screen, dialog } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const ip = require('ip');
+const QRCode = require('qrcode');
 
 const store = new Store();
 let mainWindow;
 let captureWindow;
 let lastShowAt = 0; // 记录最近一次显示时间，用于忽略刚显示时的 blur
+let server; // Express server instance
+
+// --- Local Server for Mobile Sync ---
+function startLocalServer() {
+  const expressApp = express();
+  const PORT = 3000;
+  const WebSocket = require('ws');
+
+  expressApp.use(cors());
+  expressApp.use(bodyParser.json());
+  
+  // Serve static files (Web Dashboard)
+  expressApp.use(express.static(__dirname));
+
+  // Create HTTP server
+  server = require('http').createServer(expressApp);
+  
+  // Create WebSocket server
+  const wss = new WebSocket.Server({ server });
+  
+  wss.on('connection', (ws) => {
+    console.log('Client connected');
+    ws.on('close', () => console.log('Client disconnected'));
+  });
+
+  // Broadcast function
+  const broadcastUpdate = (data) => {
+    // Notify Electron window
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('refresh-items');
+    }
+
+    // Notify WebSocket clients
+    const message = JSON.stringify({ type: 'data-updated', data });
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+  };
+
+  // API Endpoints
+  expressApp.get('/api/items', (req, res) => {
+    const items = store.get('items', []);
+    res.json(items);
+  });
+
+  expressApp.post('/api/items', (req, res) => {
+    const newItem = req.body;
+    const items = store.get('items', []);
+    items.unshift(newItem);
+    store.set('items', items);
+    
+    broadcastUpdate(items);
+    
+    res.json(items);
+  });
+
+  expressApp.delete('/api/items/:id', (req, res) => {
+    const { id } = req.params;
+    const items = store.get('items', []);
+    const newItems = items.filter(i => i.id !== id);
+    store.set('items', newItems);
+    
+    broadcastUpdate(newItems);
+    
+    res.json(newItems);
+  });
+
+  expressApp.put('/api/items', (req, res) => {
+    const newItems = req.body;
+    store.set('items', newItems);
+    
+    broadcastUpdate(newItems);
+    
+    res.json(newItems);
+  });
+
+  expressApp.put('/api/items/pin/:id', (req, res) => {
+    const { id } = req.params;
+    let items = store.get('items', []);
+    const index = items.findIndex(i => i.id === id);
+    
+    if (index !== -1) {
+      items[index].pinned = !items[index].pinned;
+      items.sort((a, b) => {
+        if (a.pinned === b.pinned) return 0;
+        return a.pinned ? -1 : 1;
+      });
+      store.set('items', items);
+      
+      broadcastUpdate(items);
+    }
+    
+    res.json(items);
+  });
+
+  expressApp.get('/api/metadata', async (req, res) => {
+    const { url } = req.query;
+    if (!url) return res.json({ title: '', image: '' });
+    
+    // Reuse existing metadata fetch logic
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+        timeout: 5000
+      });
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      
+      const title = $('meta[property="og:title"]').attr('content') || 
+                    $('meta[name="twitter:title"]').attr('content') || 
+                    $('title').text() || '';
+                    
+      const image = $('meta[property="og:image"]').attr('content') || 
+                    $('meta[name="twitter:image"]').attr('content') || '';
+                    
+      res.json({ title: title.trim(), image });
+    } catch (error) {
+      res.json({ title: '', image: '' });
+    }
+  });
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running at http://${ip.address()}:${PORT}`);
+  });
+}
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -122,6 +254,7 @@ async function showCaptureOnActiveSpace() {
 app.whenReady().then(() => {
   createMainWindow();
   createCaptureWindow();
+  startLocalServer();
 
   // 注册全局快捷键
   globalShortcut.register('CommandOrControl+Shift+O', async () => {
@@ -144,6 +277,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  if (server) server.close();
 });
 
 app.on('will-quit', () => {
@@ -238,4 +372,12 @@ ipcMain.handle('fetch-metadata', async (event, url) => {
     console.error('Fetch metadata error:', error);
     return { title: '', image: '' };
   }
+});
+
+ipcMain.handle('get-mobile-connect-info', async () => {
+  const address = ip.address();
+  const port = 3000;
+  const url = `http://${address}:${port}/web-dashboard.html`;
+  const qrCode = await QRCode.toDataURL(url);
+  return { url, qrCode };
 });

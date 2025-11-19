@@ -11,7 +11,11 @@
     "build:win": "electron-builder --win",
     "dist": "electron-builder"
   },
-  "keywords": ["信息过滤", "收藏", "productivity"],
+  "keywords": [
+    "信息过滤",
+    "收藏",
+    "productivity"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -19,10 +23,17 @@
     "electron-builder": "^25.1.8"
   },
   "dependencies": {
+    "body-parser": "^2.2.0",
     "cheerio": "^1.1.2",
+    "cors": "^2.8.5",
     "electron-store": "^8.1.0",
+    "express": "^5.1.0",
+    "ip": "^2.0.1",
     "node-fetch": "^2.7.0",
-    "sortablejs": "^1.15.6"
+    "peerjs": "^1.5.5",
+    "qrcode": "^1.5.4",
+    "sortablejs": "^1.15.6",
+    "ws": "^8.18.3"
   },
   "build": {
     "appId": "com.info-filter.app",
@@ -33,7 +44,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ]
     },
@@ -59,8 +73,3 @@
     }
   }
 }
-
-
-
-
-
