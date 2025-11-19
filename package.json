@@ -1,0 +1,66 @@
+{
+  "name": "info-filter-desktop",
+  "productName": "信息过滤器",
+  "version": "1.0.0",
+  "description": "我的信息过滤器 - 桌面版",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac --dir",
+    "build:dmg": "electron-builder --mac dmg",
+    "build:win": "electron-builder --win",
+    "dist": "electron-builder"
+  },
+  "keywords": ["信息过滤", "收藏", "productivity"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "electron-store": "^8.1.0",
+    "node-fetch": "^2.7.0",
+    "sortablejs": "^1.15.6"
+  },
+  "build": {
+    "appId": "com.info-filter.app",
+    "productName": "信息过滤器",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "image.png"
+    },
+    "files": [
+      "**/*",
+      "!**/*.md",
+      "!dist/**/*",
+      "!.git/**/*",
+      "!*.log",
+      "!icons.iconset/**/*",
+      "!**/node_modules/{@types,typescript,eslint,prettier}/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
+
+
+
+
+

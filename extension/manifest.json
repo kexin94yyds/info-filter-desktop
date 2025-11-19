@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "我的信息过滤器",
+  "version": "1.0",
+  "description": "一键收藏 Twitter 和 YouTube 内容，生成个人信息流。",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "收藏此内容"
+  },
+  "icons": {
+    "128": "icons/icon128.png"
+  }
+}
+

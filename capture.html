@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: transparent;
+      overflow: hidden;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(20px);
+      height: 100vh;
+      padding: 24px;
+      box-sizing: border-box;
+      border: 1px solid rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+    /* 边缘拖拽区域（用于移动无边框窗口） */
+    .window-drag-edge {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 10px;
+      -webkit-app-region: drag;
+      z-index: 9999;
+      background: transparent;
+    }
+    .window-drag-edge.left { left: 0; }
+    .window-drag-edge.right { right: 0; }
+    .window-drag-top {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 10px;
+      -webkit-app-region: drag;
+      z-index: 9999;
+      background: transparent;
+    }
+    /* 拖动区域 */
+    .drag-handle {
+      -webkit-app-region: drag;
+      height: 20px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .close-btn {
+      -webkit-app-region: no-drag;
+      cursor: pointer;
+      color: #999;
+      font-size: 18px;
+      border: none;
+      background: none;
+      padding: 0 5px;
+    }
+    .close-btn:hover { color: #333; }
+
+    h2 { margin: 0 0 16px 0; font-size: 16px; color: #333; display: flex; align-items: center; gap: 8px; }
+    
+    input, textarea, select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-sizing: border-box;
+      margin-bottom: 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      background: white;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: #000;
+    }
+    
+    /* 预览图 */
+    #imagePreview {
+      margin-bottom: 12px;
+      display: none;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+      background: #f3f4f6;
+    }
+    #imagePreview img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+    }
+    
+    .status-bar {
+      margin-top: auto;
+      font-size: 12px;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .key-hint {
+      background: #e5e7eb;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #4b5563;
+    }
+  </style>
+</head>
+<body>
+  <!-- 边缘拖拽区域：靠近左右与顶部时可拖动窗口 -->
+  <div class="window-drag-edge left"></div>
+  <div class="window-drag-edge right"></div>
+  <div class="window-drag-top"></div>
+  
+  <div class="container">
+    <div class="drag-handle">
+      <button class="close-btn" id="closeBtn">×</button>
+    </div>
+    <h2>
+      <span id="statusIcon">✨</span>
+      <span id="statusText">添加新内容</span>
+    </h2>
+
+    <div id="imagePreview"><img src=""></div>
+
+    <input type="text" id="url" placeholder="链接 (Cmd+V 或自动读取)" autofocus>
+    <input type="text" id="title" placeholder="标题">
+    
+    <div style="display: flex; gap: 10px;">
+      <select id="category" style="flex: 1;">
+        <option value="read_later">稍后阅读</option>
+        <option value="learning">学习资料</option>
+        <option value="inspiration">灵感</option>
+        <option value="entertainment">娱乐</option>
+      </select>
+    </div>
+
+    <textarea id="note" rows="2" placeholder="备注 (可选)"></textarea>
+    
+    <div class="status-bar">
+      <span id="loadingStatus"></span>
+      <div><span class="key-hint">Enter</span> 保存</div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const urlInput = document.getElementById('url');
+    const titleInput = document.getElementById('title');
+    const categoryInput = document.getElementById('category');
+    const noteInput = document.getElementById('note');
+    const imagePreview = document.getElementById('imagePreview');
+    const loadingStatus = document.getElementById('loadingStatus');
+    const statusText = document.getElementById('statusText');
+    
+    let currentImage = '';
+    let debounceTimer;
+
+    // 1. 窗口显示时自动执行
+    ipcRenderer.on('window-shown', async () => {
+      resetForm();
+      try {
+        const text = await ipcRenderer.invoke('read-clipboard');
+        if (text && (text.startsWith('http') || text.startsWith('www'))) {
+          urlInput.value = text;
+          fetchMetadata(text);
+        }
+        urlInput.focus();
+        urlInput.select(); // 全选链接，方便直接替换
+      } catch (e) {}
+    });
+
+    // 2. 监听输入
+    urlInput.addEventListener('input', () => {
+      const url = urlInput.value.trim();
+      if (!url) return;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchMetadata(url), 500);
+    });
+
+    // 3. 抓取元数据
+    async function fetchMetadata(url) {
+      if (!url.startsWith('http')) return;
+      
+      loadingStatus.textContent = '正在获取信息...';
+      try {
+        const data = await ipcRenderer.invoke('fetch-metadata', url);
+        if (data.title) titleInput.value = data.title;
+        if (data.image) {
+          currentImage = data.image;
+          imagePreview.style.display = 'block';
+          imagePreview.querySelector('img').src = data.image;
+        } else {
+          imagePreview.style.display = 'none';
+        }
+        loadingStatus.textContent = '✓ 获取成功';
+      } catch (e) {
+        loadingStatus.textContent = '';
+      }
+    }
+
+    // 4. Enter 键保存 (全局监听)
+    document.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        // 如果焦点在 textarea，允许换行
+        if (document.activeElement === noteInput) return;
+        
+        e.preventDefault(); // 阻止默认行为
+        saveAndClose();
+      }
+      
+      if (e.key === 'Escape') {
+        ipcRenderer.send('hide-capture-window');
+      }
+    });
+
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      ipcRenderer.send('hide-capture-window');
+    });
+
+    async function saveAndClose() {
+      if (!urlInput.value) return;
+
+      loadingStatus.textContent = '保存中...';
+      
+      const newItem = {
+        id: Date.now().toString(),
+        url: urlInput.value,
+        title: titleInput.value || urlInput.value,
+        category: categoryInput.value,
+        note: noteInput.value,
+        image: currentImage,
+        platform: getPlatform(urlInput.value),
+        createdAt: new Date().toISOString(),
+        pinned: false
+      };
+
+      await ipcRenderer.invoke('save-item', newItem);
+      
+      // 通知主窗口刷新
+      ipcRenderer.send('item-saved');
+      
+      // 隐藏自己
+      ipcRenderer.send('hide-capture-window');
+      resetForm();
+    }
+
+    function resetForm() {
+      urlInput.value = '';
+      titleInput.value = '';
+      noteInput.value = '';
+      imagePreview.style.display = 'none';
+      currentImage = '';
+      loadingStatus.textContent = '';
+    }
+
+    function getPlatform(url) {
+      if (!url) return 'Web';
+      if (url.includes('twitter.com') || url.includes('x.com')) return 'Twitter';
+      if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube';
+      return 'Web';
+    }
+  </script>
+</body>
+</html>
+
