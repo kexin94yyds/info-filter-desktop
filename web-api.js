@@ -109,7 +109,14 @@ const peerAPI = {
 
   init: (peerId) => {
     return new Promise((resolve, reject) => {
-      const peer = new Peer();
+      const peer = new Peer(null, {
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
+          ]
+        }
+      });
 
       peer.on('open', () => {
         console.log('My Peer ID:', peer.id);

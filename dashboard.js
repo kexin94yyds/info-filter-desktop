@@ -17,7 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function initPeer() {
     // const { Peer } = require('peerjs'); // Don't use require, use global from CDN
-    peer = new Peer(); // Auto-generate ID
+    peer = new Peer(null, {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    }); // Auto-generate ID
 
     peer.on('open', (id) => {
       console.log('My Peer ID:', id);
