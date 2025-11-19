@@ -196,12 +196,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // URL 输入监听
-  inputUrl.addEventListener('input', () => {
-    const url = inputUrl.value.trim();
-    if (!url) return;
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => fetchMetadata(url), 500);
-  });
+  if (inputUrl) {
+    inputUrl.addEventListener('input', () => {
+      const url = inputUrl.value.trim();
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        // 简单的防抖
+        if (window.fetchMetadataTimer) clearTimeout(window.fetchMetadataTimer);
+        window.fetchMetadataTimer = setTimeout(async () => {
+          const metadata = await window.webAPI.fetchMetadata(url);
+          if (metadata.title && !inputTitle.value) {
+            inputTitle.value = metadata.title;
+          }
+          if (metadata.image) {
+            imagePreview.querySelector('img').src = metadata.image;
+            imagePreview.style.display = 'block';
+          }
+        }, 1000);
+      }
+    });
+  }
 
   // 抓取元数据
   async function fetchMetadata(url) {
