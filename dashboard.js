@@ -34,6 +34,15 @@ document.addEventListener('DOMContentLoaded', () => {
     peer.on('connection', (conn) => {
       console.log('New peer connection');
 
+      // Keep connection open
+      conn.on('open', () => {
+        console.log('Connection opened with:', conn.peer);
+        // Send initial data immediately
+        ipcRenderer.invoke('get-items').then(items => {
+          conn.send({ type: 'items-updated', items });
+        });
+      });
+
       conn.on('data', async (data) => {
         console.log('Received from peer:', data);
 
@@ -42,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
           conn.send({ type: 'items-updated', items });
         } else if (data.type === 'save-item') {
           await ipcRenderer.invoke('save-item', data.item);
-          // Broadcast update to all peers (including this one)
           broadcastUpdate();
         } else if (data.type === 'delete-item') {
           await ipcRenderer.invoke('delete-item', data.id);
@@ -53,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (data.type === 'toggle-pin') {
           await ipcRenderer.invoke('toggle-pin', data.id);
           broadcastUpdate();
+        } else if (data.type === 'ping') {
+          conn.send({ type: 'pong' });
         }
       });
     });
@@ -69,17 +79,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadItems();
 
     // Broadcast to connected peers
-    // PeerJS doesn't have a simple "broadcast", we need to track connections or just rely on active ones
-    // For simplicity, we just wait for them to ask or we can send to all active connections if we tracked them.
-    // But wait, `peer.connections` is an object where keys are peerIds and values are arrays of connections.
-
-    Object.values(peer.connections).forEach(conns => {
-      conns.forEach(conn => {
-        if (conn.open) {
-          conn.send({ type: 'items-updated', items });
-        }
+    if (peer.connections) {
+      Object.values(peer.connections).forEach(conns => {
+        conns.forEach(conn => {
+          if (conn.open) {
+            conn.send({ type: 'items-updated', items });
+          }
+        });
       });
-    });
+    }
   }
 
   // Initialize PeerJS

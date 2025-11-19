@@ -108,7 +108,30 @@ const peerAPI = {
   dataCallback: null,
 
   init: (peerId) => {
+    const updateStatus = (status, msg) => {
+      const el = document.getElementById('status-bar');
+      if (el) {
+        el.style.display = 'block';
+        if (status === 'connected') {
+          el.style.background = '#d1fae5';
+          el.style.color = '#065f46';
+          el.textContent = '已连接到桌面端';
+          setTimeout(() => { el.style.display = 'none'; }, 3000);
+        } else if (status === 'connecting') {
+          el.style.background = '#fef3c7';
+          el.style.color = '#92400e';
+          el.textContent = '正在连接桌面端...';
+        } else {
+          el.style.background = '#fee2e2';
+          el.style.color = '#991b1b';
+          el.textContent = msg || '连接断开';
+        }
+      }
+    };
+
     return new Promise((resolve, reject) => {
+      updateStatus('connecting');
+
       const peer = new Peer(null, {
         config: {
           iceServers: [
@@ -120,15 +143,17 @@ const peerAPI = {
 
       peer.on('open', () => {
         console.log('My Peer ID:', peer.id);
-        const conn = peer.connect(peerId);
+        const conn = peer.connect(peerId, {
+          reliable: true
+        });
 
         conn.on('open', () => {
           console.log('Connected to Desktop App');
           peerAPI.conn = conn;
+          updateStatus('connected');
 
           // 请求初始数据
           conn.send({ type: 'get-items' });
-
           resolve(true);
         });
 
@@ -139,14 +164,21 @@ const peerAPI = {
           }
         });
 
+        conn.on('close', () => {
+          updateStatus('disconnected', '连接已断开，请刷新页面重试');
+          peerAPI.conn = null;
+        });
+
         conn.on('error', (err) => {
           console.error('Connection error:', err);
+          updateStatus('error', '连接错误');
           reject(err);
         });
       });
 
       peer.on('error', (err) => {
         console.error('Peer error:', err);
+        updateStatus('error', `连接失败: ${err.type}`);
         reject(err);
       });
     });
