@@ -23,16 +23,16 @@ function startLocalServer() {
 
   expressApp.use(cors());
   expressApp.use(bodyParser.json());
-  
+
   // Serve static files (Web Dashboard)
   expressApp.use(express.static(__dirname));
 
   // Create HTTP server
   server = require('http').createServer(expressApp);
-  
+
   // Create WebSocket server
   const wss = new WebSocket.Server({ server });
-  
+
   wss.on('connection', (ws) => {
     console.log('Client connected');
     ws.on('close', () => console.log('Client disconnected'));
@@ -65,9 +65,9 @@ function startLocalServer() {
     const items = store.get('items', []);
     items.unshift(newItem);
     store.set('items', items);
-    
+
     broadcastUpdate(items);
-    
+
     res.json(items);
   });
 
@@ -76,18 +76,18 @@ function startLocalServer() {
     const items = store.get('items', []);
     const newItems = items.filter(i => i.id !== id);
     store.set('items', newItems);
-    
+
     broadcastUpdate(newItems);
-    
+
     res.json(newItems);
   });
 
   expressApp.put('/api/items', (req, res) => {
     const newItems = req.body;
     store.set('items', newItems);
-    
+
     broadcastUpdate(newItems);
-    
+
     res.json(newItems);
   });
 
@@ -95,7 +95,7 @@ function startLocalServer() {
     const { id } = req.params;
     let items = store.get('items', []);
     const index = items.findIndex(i => i.id === id);
-    
+
     if (index !== -1) {
       items[index].pinned = !items[index].pinned;
       items.sort((a, b) => {
@@ -103,17 +103,17 @@ function startLocalServer() {
         return a.pinned ? -1 : 1;
       });
       store.set('items', items);
-      
+
       broadcastUpdate(items);
     }
-    
+
     res.json(items);
   });
 
   expressApp.get('/api/metadata', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.json({ title: '', image: '' });
-    
+
     // Reuse existing metadata fetch logic
     try {
       const response = await fetch(url, {
@@ -122,14 +122,14 @@ function startLocalServer() {
       });
       const html = await response.text();
       const $ = cheerio.load(html);
-      
-      const title = $('meta[property="og:title"]').attr('content') || 
-                    $('meta[name="twitter:title"]').attr('content') || 
-                    $('title').text() || '';
-                    
-      const image = $('meta[property="og:image"]').attr('content') || 
-                    $('meta[name="twitter:image"]').attr('content') || '';
-                    
+
+      const title = $('meta[property="og:title"]').attr('content') ||
+        $('meta[name="twitter:title"]').attr('content') ||
+        $('title').text() || '';
+
+      const image = $('meta[property="og:image"]').attr('content') ||
+        $('meta[name="twitter:image"]').attr('content') || '';
+
       res.json({ title: title.trim(), image });
     } catch (error) {
       res.json({ title: '', image: '' });
@@ -159,7 +159,7 @@ function createMainWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
-  
+
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
@@ -191,13 +191,13 @@ function createCaptureWindow() {
   captureWindow.on('blur', () => {
     const elapsed = Date.now() - lastShowAt;
     if (elapsed < 800) return; // 忽略刚显示后的短暂失焦
-    
+
     setTimeout(() => {
       try {
         if (captureWindow && !captureWindow.isDestroyed() && !captureWindow.isFocused()) {
           captureWindow.hide();
         }
-      } catch (err) {}
+      } catch (err) { }
     }, 200);
   });
 }
@@ -213,7 +213,7 @@ async function showCaptureOnActiveSpace() {
   const cursorPoint = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(cursorPoint);
   const workArea = display.workArea;
-  
+
   const { width: winW, height: winH } = captureWindow.getBounds();
   const targetX = Math.round(workArea.x + (workArea.width - winW) / 2);
   const targetY = Math.round(workArea.y + (workArea.height - winH) / 3); // 偏上一点
@@ -223,12 +223,12 @@ async function showCaptureOnActiveSpace() {
   // 临时在所有工作区可见（包括全屏）
   try {
     captureWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  } catch (_) {}
+  } catch (_) { }
 
   // 使用最高层级
   try {
     captureWindow.setAlwaysOnTop(true, 'screen-saver');
-  } catch (_) {}
+  } catch (_) { }
 
   captureWindow.show();
   captureWindow.focus();
@@ -238,7 +238,7 @@ async function showCaptureOnActiveSpace() {
   if (captureWindow && !captureWindow.isDestroyed() && captureWindow.webContents) {
     try {
       captureWindow.webContents.send('window-shown');
-    } catch (err) {}
+    } catch (err) { }
   }
 
   // 稍后还原，仅在当前 Space 可见
@@ -247,7 +247,7 @@ async function showCaptureOnActiveSpace() {
       if (captureWindow && !captureWindow.isDestroyed()) {
         captureWindow.setVisibleOnAllWorkspaces(false);
       }
-    } catch (_) {}
+    } catch (_) { }
   }, 200);
 }
 
@@ -332,8 +332,8 @@ ipcMain.handle('toggle-pin', (event, id) => {
   if (index !== -1) {
     items[index].pinned = !items[index].pinned;
     items.sort((a, b) => {
-        if (a.pinned === b.pinned) return 0;
-        return a.pinned ? -1 : 1;
+      if (a.pinned === b.pinned) return 0;
+      return a.pinned ? -1 : 1;
     });
     store.set('items', items);
   }
@@ -347,25 +347,47 @@ ipcMain.handle('read-clipboard', () => {
 ipcMain.handle('fetch-metadata', async (event, url) => {
   try {
     if (!url.startsWith('http')) return { title: '', image: '' };
-    
+
+    // Special handling for Twitter/X
+    if (url.includes('twitter.com') || url.includes('x.com')) {
+      // Use a bot User-Agent to get OpenGraph tags
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
+        },
+        timeout: 5000
+      });
+      const html = await res.text();
+      const $ = cheerio.load(html);
+
+      const title = $('meta[property="og:title"]').attr('content') ||
+        $('meta[name="twitter:title"]').attr('content') ||
+        $('title').text() || '';
+
+      const image = $('meta[property="og:image"]').attr('content') ||
+        $('meta[name="twitter:image"]').attr('content') || '';
+
+      return { title: title.trim(), image };
+    }
+
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
       },
       timeout: 5000
     });
-    
+
     const html = await res.text();
     const $ = cheerio.load(html);
-    
-    const title = $('meta[property="og:title"]').attr('content') || 
-                  $('meta[name="twitter:title"]').attr('content') || 
-                  $('title').text() || 
-                  '';
-                  
-    const image = $('meta[property="og:image"]').attr('content') || 
-                  $('meta[name="twitter:image"]').attr('content') || 
-                  '';
+
+    const title = $('meta[property="og:title"]').attr('content') ||
+      $('meta[name="twitter:title"]').attr('content') ||
+      $('title').text() ||
+      '';
+
+    const image = $('meta[property="og:image"]').attr('content') ||
+      $('meta[name="twitter:image"]').attr('content') ||
+      '';
 
     return { title: title.trim(), image };
   } catch (error) {
