@@ -76,15 +76,59 @@ const webAPI = {
 
   // 抓取元数据（需要后端 API）
   fetchMetadata: async (url) => {
+    if (!url) return { title: '', image: '' };
+
+    // 统一补全协议，和桌面端行为保持一致
+    const normalizedUrl = url.startsWith('http') ? url : `https://${url}`;
+
+    // 优先尝试同源/服务端 API，再回退到公共代理
+    // 这样在 Netlify 上可以使用无 CORS 限制的函数逻辑，
+    // 在本地 Express 环境下可以使用 /api/metadata，
+    // 其它场景则回退到 allorigins 代理。
+
+    // 1) Netlify Function（/.netlify/functions/fetch-metadata）
     try {
-      // 使用 CORS 代理或后端 API
-      // 这里先用一个简单的代理服务
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const fnRes = await fetch(`/.netlify/functions/fetch-metadata?url=${encodeURIComponent(normalizedUrl)}`);
+      if (fnRes.ok) {
+        const text = await fnRes.text();
+        const data = JSON.parse(text);
+        if (data && (data.title || data.image)) {
+          return {
+            title: (data.title || '').trim(),
+            image: data.image || ''
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Netlify metadata function unavailable, fallback to other methods.', e);
+    }
+
+    // 2) 本地/桌面端内置的 Express API（用于手机连接到电脑时）
+    try {
+      const apiRes = await fetch(`/api/metadata?url=${encodeURIComponent(normalizedUrl)}`);
+      if (apiRes.ok) {
+        const text = await apiRes.text();
+        const data = JSON.parse(text);
+        if (data && (data.title || data.image)) {
+          return {
+            title: (data.title || '').trim(),
+            image: data.image || ''
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Local /api/metadata unavailable, fallback to proxy.', e);
+    }
+
+    // 3) 公共 CORS 代理（最后的兜底手段）
+    try {
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(normalizedUrl)}`;
       const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error(`Proxy HTTP ${response.status}`);
+
       const data = await response.json();
       const html = data.contents;
 
-      // 使用 DOMParser 解析 HTML
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
 
@@ -97,7 +141,7 @@ const webAPI = {
 
       return { title: title.trim(), image };
     } catch (error) {
-      console.error('Fetch metadata error:', error);
+      console.error('Fetch metadata error (proxy fallback):', error);
       return { title: '', image: '' };
     }
   }
@@ -309,7 +353,7 @@ const hybridAPI = {
   },
 
   fetchMetadata: async (url) => {
-    // 使用 webAPI 的 fetchMetadata（通过代理）
+    // 复用 webAPI 的 fetchMetadata（内部已根据环境选择 Netlify 函数 / 本地 API / 代理）
     return await webAPI.fetchMetadata(url);
   },
 
@@ -412,4 +456,3 @@ const hybridAPI = {
     }
   }
 })();
-

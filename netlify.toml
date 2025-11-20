@@ -5,6 +5,9 @@
   # 不需要构建命令，直接部署静态文件
   # command = ""
 
+[functions]
+  directory = "netlify/functions"
+
 # 头部设置
 [[headers]]
   for = "/*"
@@ -14,4 +17,3 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Cache-Control = "public, max-age=3600"
-
