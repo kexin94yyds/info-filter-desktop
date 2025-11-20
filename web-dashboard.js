@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const grid = document.getElementById('grid');
   const filters = document.getElementById('filters');
   const showAddModalBtn = document.getElementById('showAddModalBtn');
-  const importDesktopBtn = document.getElementById('importDesktopBtn');
   const exportBtn = document.getElementById('exportBtn');
   const importBtn = document.getElementById('importBtn');
   const importFile = document.getElementById('importFile');
@@ -171,72 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 导入桌面端数据
-  const importDesktopModal = document.getElementById('importDesktopModal');
-  const desktopIpInput = document.getElementById('desktopIpInput');
-  const cancelImportBtn = document.getElementById('cancelImportBtn');
-  const confirmImportBtn = document.getElementById('confirmImportBtn');
-  
-  if (importDesktopBtn) {
-    importDesktopBtn.addEventListener('click', () => {
-      if (importDesktopModal) {
-        importDesktopModal.style.display = 'flex';
-        desktopIpInput.value = '';
-        desktopIpInput.focus();
-      }
-    });
-  }
-  
-  if (cancelImportBtn) {
-    cancelImportBtn.addEventListener('click', () => {
-      if (importDesktopModal) {
-        importDesktopModal.style.display = 'none';
-      }
-    });
-  }
-  
-  if (confirmImportBtn) {
-    confirmImportBtn.addEventListener('click', async () => {
-      if (!window.webAPI || !window.webAPI.tryImportFromDesktop) {
-        alert('此功能需要桌面端应用运行在本地服务器（端口 3000）\n\n请确保：\n1. 桌面端应用正在运行\n2. 手机和电脑在同一 WiFi 网络');
-        return;
-      }
-      
-      const customIp = desktopIpInput.value.trim();
-      confirmImportBtn.disabled = true;
-      confirmImportBtn.textContent = '正在导入...';
-      
-      try {
-        const result = await window.webAPI.tryImportFromDesktop(customIp || null);
-        if (result.success) {
-          alert(`✅ 成功导入 ${result.count} 条数据！`);
-          // 重新加载数据
-          await loadItems();
-          if (importDesktopModal) {
-            importDesktopModal.style.display = 'none';
-          }
-        } else {
-          alert('❌ 无法连接到桌面端\n\n请确保：\n1. 桌面端应用正在运行\n2. 手机和电脑在同一 WiFi 网络\n3. 输入正确的电脑 IP 地址\n\n如何获取电脑 IP：\n- Mac: 系统设置 → 网络\n- Windows: ipconfig');
-        }
-      } catch (e) {
-        console.error('Import error:', e);
-        alert('导入失败：' + e.message);
-      } finally {
-        confirmImportBtn.disabled = false;
-        confirmImportBtn.textContent = '开始导入';
-      }
-    });
-  }
-  
-  // 点击背景关闭弹窗
-  if (importDesktopModal) {
-    importDesktopModal.addEventListener('click', (e) => {
-      if (e.target === importDesktopModal) {
-        importDesktopModal.style.display = 'none';
-      }
-    });
-  }
-
   // 显示添加弹窗
   showAddModalBtn.addEventListener('click', async () => {
     addModal.classList.add('show');
@@ -280,7 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 导出功能 (仅在有此按钮时绑定)
   if (exportBtn) {
     exportBtn.addEventListener('click', async () => {
-      const items = await window.webAPI.getItems();
+      const items = allItems && allItems.length
+        ? allItems
+        : await window.webAPI.getItems();
       const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -315,7 +250,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           if (confirm(`准备导入 ${importedItems.length} 条数据。是否合并到现有数据中？\n(点击"取消"将放弃导入)`)) {
-            const currentItems = await window.webAPI.getItems();
+            const currentItems = allItems && allItems.length
+              ? allItems
+              : await window.webAPI.getItems();
             // 合并策略：ID 去重，保留导入的数据优先
             const map = new Map();
 
@@ -487,49 +424,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.webAPI && window.webAPI.getItems) {
       try {
         const items = await window.webAPI.getItems();
-        if (items && Array.isArray(items) && items.length > 0) {
+        if (items && Array.isArray(items)) {
           allItems = items;
           renderGrid(getFilteredItems(items));
-        } else {
-          // 如果没有数据，显示导入提示
-          showImportHint();
         }
       } catch (e) {
         console.error('Failed to load items:', e);
-        showImportHint();
       }
-    } else {
-      showImportHint();
     }
   }, 100);
-  
-  // 显示导入提示
-  function showImportHint() {
-    // 检查是否已经显示过提示
-    if (localStorage.getItem('import-hint-shown')) return;
-    
-    const hintDiv = document.createElement('div');
-    hintDiv.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; display: flex; align-items: center; gap: 12px; max-width: 90%;';
-    hintDiv.innerHTML = `
-      <span>💡 点击"📥 导入桌面数据"按钮，从桌面端导入数据</span>
-      <button id="closeHintBtn" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✕</button>
-    `;
-    document.body.appendChild(hintDiv);
-    
-    const closeBtn = hintDiv.querySelector('#closeHintBtn');
-    closeBtn.addEventListener('click', () => {
-      hintDiv.remove();
-      localStorage.setItem('import-hint-shown', 'true');
-    });
-    
-    // 5秒后自动消失
-    setTimeout(() => {
-      if (hintDiv.parentNode) {
-        hintDiv.remove();
-        localStorage.setItem('import-hint-shown', 'true');
-      }
-    }, 5000);
-  }
 
   // 检查网络连接状态（仅在非 Electron 环境下）
   if (!window.electron) {

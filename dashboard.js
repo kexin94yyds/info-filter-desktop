@@ -35,20 +35,12 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('New peer connection');
 
       // Keep connection open
-      conn.on('open', async () => {
+      conn.on('open', () => {
         console.log('Connection opened with:', conn.peer);
         // Send initial data immediately
-        try {
-          const items = await ipcRenderer.invoke('get-items');
-          console.log('Sending initial items to web client:', items.length);
-          if (items && items.length > 0) {
-            conn.send({ type: 'items-updated', items });
-          } else {
-            console.log('No items to send');
-          }
-        } catch (err) {
-          console.error('Error getting items:', err);
-        }
+        ipcRenderer.invoke('get-items').then(items => {
+          conn.send({ type: 'items-updated', items });
+        });
       });
 
       conn.on('data', async (data) => {
@@ -64,31 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
           await ipcRenderer.invoke('delete-item', data.id);
           broadcastUpdate();
         } else if (data.type === 'update-items') {
-          // 智能合并：保留桌面端和网页端的数据
-          const desktopItems = await ipcRenderer.invoke('get-items');
-          const webItems = data.items || [];
-          
-          if (webItems.length > 0) {
-            // 合并策略：合并两个数据源，去重（按 ID）
-            const itemMap = new Map();
-            
-            // 先添加桌面端数据
-            desktopItems.forEach(item => itemMap.set(item.id, item));
-            
-            // 再添加网页端数据（网页端数据优先，因为可能是最新的）
-            webItems.forEach(item => itemMap.set(item.id, item));
-            
-            // 转换为数组并按时间排序
-            const mergedItems = Array.from(itemMap.values()).sort((a, b) => {
-              // 置顶的优先
-              if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-              // 然后按创建时间倒序
-              return new Date(b.createdAt) - new Date(a.createdAt);
-            });
-            
-            await ipcRenderer.invoke('update-items', mergedItems);
-            broadcastUpdate();
-          }
+          await ipcRenderer.invoke('update-items', data.items);
+          broadcastUpdate();
         } else if (data.type === 'toggle-pin') {
           await ipcRenderer.invoke('toggle-pin', data.id);
           broadcastUpdate();
