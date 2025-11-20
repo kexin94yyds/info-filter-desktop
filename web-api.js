@@ -1,4 +1,5 @@
 // Web 版本的存储适配器（使用 localStorage）
+// Last updated: Trigger Netlify deploy
 const webStorage = {
   get: async (key) => {
     try {
