@@ -17,6 +17,15 @@ let server; // Express server instance
 
 // --- Local Server for Mobile Sync ---
 function startLocalServer() {
+  // 如果已有服务器实例，先关闭它
+  if (server) {
+    try {
+      server.close();
+    } catch (e) {
+      console.log('Closing existing server:', e.message);
+    }
+  }
+
   const expressApp = express();
   const PORT = 3000;
   const WebSocket = require('ws');
@@ -136,21 +145,38 @@ function startLocalServer() {
     }
   });
 
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running at http://${ip.address()}:${PORT}`);
-  });
-
+  // 设置错误处理（必须在 listen 之前）
   server.on('error', (e) => {
     if (e.code === 'EADDRINUSE') {
-      console.error('Address in use, retrying...');
-      setTimeout(() => {
-        server.close();
-        server.listen(PORT, '0.0.0.0');
-      }, 1000);
+      console.error(`端口 ${PORT} 已被占用，请关闭占用该端口的程序或重启应用`);
+      // 显示错误对话框
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        dialog.showErrorBox(
+          '端口占用错误',
+          `端口 ${PORT} 已被占用。\n\n可能的原因：\n1. 应用的其他实例正在运行\n2. 其他程序占用了该端口\n\n解决方案：\n- 关闭其他占用端口的程序\n- 或重启应用`
+        );
+      }
     } else {
       console.error('Server error:', e);
     }
   });
+
+  // 尝试启动服务器
+  try {
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running at http://${ip.address()}:${PORT}`);
+    });
+  } catch (e) {
+    console.error('Failed to start server:', e);
+    if (e.code === 'EADDRINUSE') {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        dialog.showErrorBox(
+          '端口占用错误',
+          `端口 ${PORT} 已被占用。\n\n请关闭占用该端口的程序后重试。`
+        );
+      }
+    }
+  }
 }
 
 function createMainWindow() {
@@ -253,14 +279,11 @@ async function showCaptureOnActiveSpace() {
     } catch (err) { }
   }
 
-  // 稍后还原，仅在当前 Space 可见
-  setTimeout(() => {
-    try {
-      if (captureWindow && !captureWindow.isDestroyed()) {
-        captureWindow.setVisibleOnAllWorkspaces(false);
-      }
-    } catch (_) { }
-  }, 200);
+  // 🔑 关键修复：不再还原工作区可见性
+  // 之前 200ms 后调用 setVisibleOnAllWorkspaces(false) 会导致窗口在全屏应用前面来回跳动
+  // 因为这会让窗口回到原来的 Space，而不是停留在当前全屏应用的 Space
+  // 保持 setVisibleOnAllWorkspaces(true) 可以让窗口始终覆盖在当前 Space（包括全屏应用）
+  console.log('[SHOW_CAPTURE] 保持窗口在所有工作区可见（避免全屏应用前跳动）');
 }
 
 app.whenReady().then(() => {
@@ -347,6 +370,16 @@ ipcMain.handle('toggle-pin', (event, id) => {
       if (a.pinned === b.pinned) return 0;
       return a.pinned ? -1 : 1;
     });
+    store.set('items', items);
+  }
+  return items;
+});
+
+ipcMain.handle('update-item', (event, id, updates) => {
+  let items = store.get('items', []);
+  const index = items.findIndex(i => i.id === id);
+  if (index !== -1) {
+    items[index] = { ...items[index], ...updates };
     store.set('items', items);
   }
   return items;

@@ -7,10 +7,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportBtn = document.getElementById('exportBtn');
   const importBtn = document.getElementById('importBtn');
   const importFile = document.getElementById('importFile');
+  const noteModalOverlay = document.getElementById('noteModalOverlay');
+  const noteModalTextarea = document.getElementById('noteModalTextarea');
+  const noteModalCancelBtn = document.getElementById('noteModalCancelBtn');
+  const noteModalSaveBtn = document.getElementById('noteModalSaveBtn');
+
+  let editingItemId = null;
 
   let allItems = [];
   let sortableInstance;
-
+    
   // PeerJS Host Logic
   let peer;
   let peerId;
@@ -60,6 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
           broadcastUpdate();
         } else if (data.type === 'toggle-pin') {
           await ipcRenderer.invoke('toggle-pin', data.id);
+          broadcastUpdate();
+        } else if (data.type === 'update-item') {
+          await ipcRenderer.invoke('update-item', data.id, data.updates);
           broadcastUpdate();
         } else if (data.type === 'fetch-metadata') {
           try {
@@ -315,7 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="card-footer">
           <span class="date">${new Date(item.createdAt).toLocaleDateString()}</span>
-          <button class="delete-btn" data-id="${item.id}">删除</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="edit-btn" data-id="${item.id}" title="编辑备注">编辑</button>
+            <button class="delete-btn" data-id="${item.id}">删除</button>
+          </div>
         </div>
       `;
 
@@ -326,6 +338,88 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       grid.appendChild(card);
+    });
+
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = e.target.dataset.id;
+        const item = allItems.find(i => i.id === id);
+        if (!item) return;
+
+        const card = e.target.closest('.card');
+        const cardContent = card.querySelector('.card-content');
+        let noteDiv = cardContent.querySelector('.card-note');
+        
+        // 如果已经在编辑状态，跳过
+        if (cardContent.querySelector('.inline-edit-textarea')) return;
+
+        // 创建行内编辑区域
+        const editContainer = document.createElement('div');
+        editContainer.className = 'inline-edit-container';
+        editContainer.innerHTML = `
+          <textarea class="inline-edit-textarea" placeholder="填写你的想法、摘录或下一步行动...">${escapeHtml(item.note || '')}</textarea>
+          <div class="inline-edit-actions">
+            <button type="button" class="inline-cancel-btn">取消</button>
+            <button type="button" class="inline-save-btn">保存</button>
+          </div>
+        `;
+
+        // 隐藏原有备注
+        if (noteDiv) {
+          noteDiv.style.display = 'none';
+        }
+
+        // 插入编辑区域
+        cardContent.appendChild(editContainer);
+
+        const textarea = editContainer.querySelector('.inline-edit-textarea');
+        setTimeout(() => {
+          textarea.focus();
+          const length = textarea.value.length;
+          textarea.setSelectionRange(length, length);
+        }, 10);
+
+        // 取消按钮
+        const cancelBtn = editContainer.querySelector('.inline-cancel-btn');
+        cancelBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          editContainer.remove();
+          if (noteDiv) {
+            noteDiv.style.display = '';
+          }
+        });
+
+        // 保存按钮
+        const saveBtn = editContainer.querySelector('.inline-save-btn');
+        saveBtn.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const newNote = textarea.value.trim();
+          if (newNote !== (item.note || '')) {
+            allItems = await ipcRenderer.invoke('update-item', id, { note: newNote });
+            await loadItems();
+          } else {
+            // 即使内容没变化，也要移除编辑状态
+            editContainer.remove();
+            if (noteDiv) {
+              noteDiv.style.display = '';
+            }
+          }
+        });
+
+        // 支持 Enter+Ctrl/Cmd 保存，Esc 取消
+        textarea.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Escape') {
+            ev.preventDefault();
+            cancelBtn.click();
+          } else if ((ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey))) {
+            ev.preventDefault();
+            saveBtn.click();
+          }
+        });
+      });
     });
 
     document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -339,6 +433,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     initSortable();
+  }
+
+  // 编辑备注弹窗事件
+  if (noteModalOverlay && noteModalCancelBtn && noteModalSaveBtn && noteModalTextarea) {
+    noteModalCancelBtn.addEventListener('click', () => {
+      noteModalOverlay.classList.remove('show');
+      editingItemId = null;
+    });
+
+    noteModalOverlay.addEventListener('click', (e) => {
+      if (e.target === noteModalOverlay) {
+        noteModalOverlay.classList.remove('show');
+        editingItemId = null;
+      }
+    });
+
+    noteModalSaveBtn.addEventListener('click', async () => {
+      if (!editingItemId) {
+        noteModalOverlay.classList.remove('show');
+        return;
+      }
+
+      const item = allItems.find(i => i.id === editingItemId);
+      if (!item) {
+        noteModalOverlay.classList.remove('show');
+        editingItemId = null;
+        return;
+      }
+
+      const newNote = noteModalTextarea.value;
+      if (newNote !== item.note) {
+        allItems = await ipcRenderer.invoke('update-item', editingItemId, { note: newNote });
+        await loadItems();
+      }
+
+      noteModalOverlay.classList.remove('show');
+      editingItemId = null;
+    });
   }
 
   function getCategoryName(key) {

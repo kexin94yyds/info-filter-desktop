@@ -63,6 +63,17 @@ const webAPI = {
     return items;
   },
 
+  // 更新单个收藏
+  updateItem: async (id, updates) => {
+    const items = await webAPI.getItems();
+    const index = items.findIndex(i => i.id === id);
+    if (index !== -1) {
+      items[index] = { ...items[index], ...updates };
+      await webStorage.set('items', items);
+    }
+    return items;
+  },
+
   // 读取剪贴板（Web API）
   readClipboard: async () => {
     try {
@@ -318,6 +329,23 @@ const hybridAPI = {
     return items;
   },
 
+  updateItem: async (id, updates) => {
+    // 先更新本地数据
+    const items = await webStorage.get('items') || [];
+    const index = items.findIndex(i => i.id === id);
+    if (index !== -1) {
+      items[index] = { ...items[index], ...updates };
+      await webStorage.set('items', items);
+    }
+    
+    // 如果已连接，同步到桌面端
+    if (hybridAPI.conn && hybridAPI.conn.open) {
+      hybridAPI.conn.send({ type: 'update-item', id, updates });
+    }
+    
+    return items;
+  },
+
   readClipboard: async () => {
     try {
       return await navigator.clipboard.readText();
@@ -413,6 +441,7 @@ const hybridAPI = {
         deleteItem: (id) => ipcRenderer.invoke('delete-item', id),
         updateItems: (items) => ipcRenderer.invoke('update-items', items),
         togglePin: (id) => ipcRenderer.invoke('toggle-pin', id),
+        updateItem: (id, updates) => ipcRenderer.invoke('update-item', id, updates),
         readClipboard: () => ipcRenderer.invoke('read-clipboard'),
         fetchMetadata: (url) => ipcRenderer.invoke('fetch-metadata', url),
         getMobileConnectInfo: () => ipcRenderer.invoke('get-mobile-connect-info'),

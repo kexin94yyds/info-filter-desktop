@@ -211,6 +211,20 @@
       color: #9ca3af;
     }
 
+    .edit-btn {
+      color: #2563eb;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .edit-btn:hover {
+      background: #dbeafe;
+    }
+
     .delete-btn {
       color: #ef4444;
       background: none;
@@ -230,6 +244,134 @@
       text-align: center;
       padding: 60px;
       color: #6b7280;
+    }
+
+    /* 行内编辑样式 */
+    .inline-edit-container {
+      margin-top: 8px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .inline-edit-textarea {
+      width: 100%;
+      min-height: 60px;
+      resize: vertical;
+      border-radius: 6px;
+      border: 1px solid #d1d5db;
+      padding: 8px 10px;
+      font-size: 13px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    .inline-edit-textarea:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+    }
+
+    .inline-edit-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .inline-cancel-btn,
+    .inline-save-btn {
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      border: none;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .inline-cancel-btn {
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .inline-cancel-btn:hover {
+      background: #e5e7eb;
+    }
+
+    .inline-save-btn {
+      background: #f97316;
+      color: white;
+    }
+
+    .inline-save-btn:hover {
+      background: #ea580c;
+    }
+
+    /* 编辑备注弹窗 */
+    .note-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    .note-modal-overlay.show {
+      display: flex;
+    }
+
+    .note-modal {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+    }
+
+    .note-modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .note-modal-textarea {
+      width: 100%;
+      min-height: 90px;
+      resize: vertical;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      padding: 8px 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    .note-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .note-modal-btn {
+      border-radius: 8px;
+      border: none;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .note-modal-btn.cancel {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .note-modal-btn.save {
+      background: #2563eb;
+      color: #ffffff;
     }
   </style>
 </head>
@@ -253,6 +395,18 @@
 
     <div id="grid" class="grid">
       <!-- 内容区域 -->
+    </div>
+  </div>
+
+  <!-- 编辑备注弹窗 -->
+  <div class="note-modal-overlay" id="noteModalOverlay">
+    <div class="note-modal">
+      <div class="note-modal-title">编辑备注</div>
+      <textarea id="noteModalTextarea" class="note-modal-textarea" placeholder="填写你的想法、摘录或下一步行动..."></textarea>
+      <div class="note-modal-footer">
+        <button class="note-modal-btn cancel" id="noteModalCancelBtn">取消</button>
+        <button class="note-modal-btn save" id="noteModalSaveBtn">保存</button>
+      </div>
     </div>
   </div>
 

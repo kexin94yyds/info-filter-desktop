@@ -98,7 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="card-footer">
           <span class="date">${new Date(item.createdAt).toLocaleDateString()}</span>
-          <button class="delete-btn" data-id="${item.id}">删除</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="edit-btn" data-id="${item.id}" title="编辑备注">编辑</button>
+            <button class="delete-btn" data-id="${item.id}">删除</button>
+          </div>
         </div>
       `;
 
@@ -109,6 +112,21 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       grid.appendChild(card);
+    });
+
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = e.target.dataset.id;
+        const item = allItems.find(i => i.id === id);
+        if (!item) return;
+        
+        const newNote = prompt('编辑备注：', item.note || '');
+        if (newNote !== null && newNote !== item.note) {
+          allItems = await window.webAPI.updateItem(id, { note: newNote });
+          loadItems();
+        }
+      });
     });
 
     document.querySelectorAll('.delete-btn').forEach(btn => {
