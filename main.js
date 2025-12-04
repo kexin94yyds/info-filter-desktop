@@ -123,8 +123,28 @@ function startLocalServer() {
     const { url } = req.query;
     if (!url) return res.json({ title: '', image: '' });
 
-    // Reuse existing metadata fetch logic
     try {
+      // YouTube oEmbed API
+      if (/youtube\.com\/watch|youtu\.be\//i.test(url)) {
+        try {
+          const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+          const oembedRes = await fetch(oembedUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
+            timeout: 5000
+          });
+          if (oembedRes.ok) {
+            const data = await oembedRes.json();
+            return res.json({
+              title: (data.title || '').trim(),
+              image: data.thumbnail_url || ''
+            });
+          }
+        } catch (e) {
+          console.error('YouTube oEmbed error:', e);
+        }
+      }
+
+      // Generic fetch
       const response = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
         timeout: 5000
@@ -184,6 +204,7 @@ function createMainWindow() {
     width: 1100,
     height: 800,
     show: false,
+    alwaysOnTop: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -191,7 +212,13 @@ function createMainWindow() {
     icon: path.join(__dirname, 'icon.png')
   });
 
-  mainWindow.loadFile('dashboard.html');
+  mainWindow.loadFile('flow.html');
+
+  // 设置在所有工作区可见（包括全屏应用）
+  try {
+    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  } catch (_) { }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -256,11 +283,16 @@ async function showCaptureOnActiveSpace() {
   const targetX = Math.round(workArea.x + (workArea.width - winW) / 2);
   const targetY = Math.round(workArea.y + (workArea.height - winH) / 3); // 偏上一点
 
+  console.log('[DEBUG] cursorPoint:', cursorPoint);
+  console.log('[DEBUG] display:', display.id, workArea);
+  console.log('[DEBUG] targetX/Y:', targetX, targetY);
+
   captureWindow.setPosition(targetX, targetY);
 
   // 临时在所有工作区可见（包括全屏）
   try {
     captureWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    console.log('[DEBUG] setVisibleOnAllWorkspaces(true) called');
   } catch (_) { }
 
   // 使用最高层级
@@ -292,7 +324,7 @@ app.whenReady().then(() => {
   startLocalServer();
 
   // 注册全局快捷键
-  globalShortcut.register('CommandOrControl+Shift+I', async () => {
+  const ret = globalShortcut.register('CommandOrControl+Shift+I', async () => {
     if (captureWindow) {
       if (captureWindow.isVisible()) {
         captureWindow.hide();
@@ -303,6 +335,12 @@ app.whenReady().then(() => {
       createCaptureWindow();
     }
   });
+
+  if (!ret) {
+    console.log('⚠️ 快捷键 Shift+Cmd+I 注册失败（可能已被其他应用占用）');
+  } else {
+    console.log('✅ 快捷键 Shift+Cmd+I 注册成功');
+  }
 
   app.on('activate', () => {
     if (!mainWindow) createMainWindow();
@@ -340,6 +378,11 @@ ipcMain.on('open-dashboard', () => {
 
 ipcMain.handle('get-items', () => {
   return store.get('items', []);
+});
+
+ipcMain.handle('set-items', (event, items) => {
+  store.set('items', items);
+  return items;
 });
 
 ipcMain.handle('save-item', (event, item) => {
@@ -392,6 +435,27 @@ ipcMain.handle('read-clipboard', () => {
 ipcMain.handle('fetch-metadata', async (event, url) => {
   try {
     if (!url.startsWith('http')) return { title: '', image: '' };
+
+    // Special handling for YouTube - use oEmbed API
+    if (/youtube\.com\/watch|youtu\.be\//i.test(url)) {
+      try {
+        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+        const oembedRes = await fetch(oembedUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
+          timeout: 5000
+        });
+        if (oembedRes.ok) {
+          const data = await oembedRes.json();
+          return {
+            title: (data.title || '').trim(),
+            image: data.thumbnail_url || ''
+          };
+        }
+      } catch (e) {
+        console.error('YouTube oEmbed error:', e);
+        // Fall through to generic fetch
+      }
+    }
 
     // Special handling for Twitter/X
     if (url.includes('twitter.com') || url.includes('x.com')) {

@@ -148,35 +148,39 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 20px;
+      margin-top: 16px;
       flex-shrink: 0;
+      gap: 8px;
     }
 
     .save-group {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
     .primary-btn {
       background: #2563eb;
       color: white;
       border: none;
-      padding: 8px 20px;
+      padding: 6px 14px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
+      white-space: nowrap;
     }
 
     .secondary-btn {
       background: white;
       color: #374151;
       border: 1px solid #d1d5db;
-      padding: 8px 16px;
+      padding: 6px 10px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
+      white-space: nowrap;
     }
 
     .secondary-btn:hover {
@@ -191,7 +195,95 @@
       font-weight: 600;
       color: #4b5563;
     }
+
+    .file-drop-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #fafafa;
+      margin-bottom: 12px;
+    }
+    .file-drop-zone:hover {
+      border-color: #2563eb;
+      background: rgba(37, 99, 235, 0.05);
+    }
+    .file-drop-zone.drag-over {
+      border-color: #2563eb;
+      background: rgba(37, 99, 235, 0.1);
+    }
+    .file-drop-icon {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 8px;
+      background: #dbeafe;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .file-drop-icon svg {
+      width: 22px;
+      height: 22px;
+      color: #2563eb;
+    }
+    .file-drop-text {
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    .file-drop-hint {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    .file-drop-zone.has-file {
+      border-style: solid;
+      border-color: #10b981;
+      background: #ecfdf5;
+    }
+    .file-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .file-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .file-icon svg {
+      width: 20px;
+      height: 20px;
+      color: white;
+    }
+    .file-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .file-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-size {
+      font-size: 11px;
+      color: #6b7280;
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 
 <body>
@@ -213,9 +305,29 @@
       <div id="imagePreview"><img src=""></div>
 
       <input type="text" id="url" placeholder="链接 (Cmd+V 或自动读取)" autofocus>
+      
+      <!-- 文件拖拽区域 -->
+      <div id="dropZone" class="file-drop-zone">
+        <div class="file-drop-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13"/>
+          </svg>
+        </div>
+        <div class="file-drop-text">拖拽文件到这里添加</div>
+        <div class="file-drop-hint">支持 EPUB、MP3、WAV 等</div>
+        <input type="file" id="fileInput" accept=".epub,audio/*" style="display: none;">
+      </div>
+      
       <input type="text" id="title" placeholder="标题">
 
       <div style="display: flex; gap: 10px;">
+        <select id="mode" style="flex: 1;">
+          <option value="video">视频</option>
+          <option value="book">书籍</option>
+          <option value="paper">论文</option>
+          <option value="audio">音频</option>
+          <option value="web">网页</option>
+        </select>
         <select id="category" style="flex: 1;">
           <option value="read_later">稍后阅读</option>
           <option value="learning">学习资料</option>
@@ -224,13 +336,16 @@
         </select>
       </div>
 
-      <textarea id="note" rows="2" placeholder="备注 (可选，Cmd+Enter 换行，Enter 保存)"></textarea>
+      <textarea id="note" rows="2" placeholder="备注 (可选，Enter 保存，Shift+Enter 换行)"></textarea>
     </div>
 
     <div class="modal-footer">
-      <button id="openDashboardBtn" class="secondary-btn">打开我的收藏库</button>
       <div class="save-group">
-        <span class="key-hint">Enter</span>
+        <span class="key-hint">⌘↵</span>
+        <button id="openDashboardBtn" class="secondary-btn">收藏库</button>
+      </div>
+      <div class="save-group">
+        <span class="key-hint">↵</span>
         <button id="saveBtn" class="primary-btn">保存</button>
       </div>
     </div>
@@ -244,6 +359,7 @@
 
     const urlInput = document.getElementById('url');
     const titleInput = document.getElementById('title');
+    const modeInput = document.getElementById('mode');
     const categoryInput = document.getElementById('category');
     const noteInput = document.getElementById('note');
     const imagePreview = document.getElementById('imagePreview');
@@ -252,6 +368,135 @@
 
     let currentImage = '';
     let debounceTimer;
+    let pendingFileData = null;
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    // 点击打开文件选择
+    dropZone.addEventListener('click', () => {
+      fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) {
+        handleDroppedFile(e.target.files[0]);
+      }
+    });
+
+    // 文件拖拽处理
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('drag-over');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) {
+        handleDroppedFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    async function handleDroppedFile(file) {
+      const fileName = file.name.toLowerCase();
+      
+      // 检查文件类型
+      if (fileName.endsWith('.epub')) {
+        modeInput.value = 'book';
+        await processEpubFile(file);
+      } else if (file.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac)$/i.test(fileName)) {
+        modeInput.value = 'audio';
+        await processAudioFile(file);
+      } else {
+        alert('不支持的文件格式，仅支持 EPUB 和音频文件');
+      }
+    }
+
+    async function processEpubFile(file) {
+      loadingStatus.textContent = '正在解析 EPUB...';
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        
+        let title = file.name.replace('.epub', '');
+        let author = '';
+        
+        // 尝试解析 metadata
+        const containerXml = await zip.file('META-INF/container.xml')?.async('string');
+        if (containerXml) {
+          const rootfileMatch = containerXml.match(/full-path="([^"]+)"/);
+          if (rootfileMatch) {
+            const opfContent = await zip.file(rootfileMatch[1])?.async('string');
+            if (opfContent) {
+              const titleMatch = opfContent.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i);
+              const authorMatch = opfContent.match(/<dc:creator[^>]*>([^<]+)<\/dc:creator>/i);
+              if (titleMatch) title = titleMatch[1];
+              if (authorMatch) author = authorMatch[1];
+            }
+          }
+        }
+        
+        titleInput.value = title;
+        pendingFileData = {
+          type: 'epub',
+          data: arrayBuffer,
+          fileName: file.name,
+          fileSize: file.size,
+          author: author
+        };
+        
+        // 显示文件信息
+        showFileInfo('book', file.name, file.size);
+        loadingStatus.textContent = '✓ EPUB 解析成功';
+      } catch (e) {
+        console.error('解析 EPUB 失败:', e);
+        loadingStatus.textContent = '解析失败';
+      }
+    }
+
+    async function processAudioFile(file) {
+      loadingStatus.textContent = '正在处理音频...';
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const title = file.name.replace(/\.[^.]+$/, '');
+        
+        titleInput.value = title;
+        pendingFileData = {
+          type: 'audio',
+          data: arrayBuffer,
+          fileName: file.name,
+          fileSize: file.size
+        };
+        
+        showFileInfo('audio', file.name, file.size);
+        loadingStatus.textContent = '✓ 音频处理完成';
+      } catch (e) {
+        console.error('处理音频失败:', e);
+        loadingStatus.textContent = '处理失败';
+      }
+    }
+
+    function showFileInfo(type, name, size) {
+      const icon = type === 'book' 
+        ? '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13"/></svg>'
+        : '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>';
+      
+      const sizeStr = size < 1024 * 1024 
+        ? (size / 1024).toFixed(1) + ' KB'
+        : (size / 1024 / 1024).toFixed(1) + ' MB';
+      
+      // 更新拖拽区域显示文件信息
+      dropZone.classList.add('has-file');
+      dropZone.innerHTML = `
+        <div class="file-icon" style="background: #d1fae5;">${icon}</div>
+        <div class="file-drop-text" style="color: #059669;">${name}</div>
+        <div class="file-drop-hint">${sizeStr} · 点击更换文件</div>
+        <input type="file" id="fileInput" accept=".epub,audio/*" style="display: none;">
+      `;
+    }
 
     // 1. 窗口显示时自动执行
     ipcRenderer.on('window-shown', async () => {
@@ -279,6 +524,9 @@
     async function fetchMetadata(url) {
       if (!url.startsWith('http')) return;
 
+      // 自动检测模式
+      autoDetectMode(url);
+      
       loadingStatus.textContent = '正在获取信息...';
       try {
         const data = await ipcRenderer.invoke('fetch-metadata', url);
@@ -287,8 +535,11 @@
           currentImage = data.image;
           imagePreview.style.display = 'block';
           imagePreview.querySelector('img').src = data.image;
+          // 有图片时隐藏拖拽区域
+          dropZone.style.display = 'none';
         } else {
           imagePreview.style.display = 'none';
+          dropZone.style.display = '';
         }
         loadingStatus.textContent = '✓ 获取成功';
       } catch (e) {
@@ -296,19 +547,19 @@
       }
     }
 
-    // 4. Enter 键保存 (全局监听)
+    // 4. 快捷键处理
     document.addEventListener('keydown', async (e) => {
-      // Cmd+Enter 在备注框中换行
+      // Cmd+Enter 打开收藏库
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-        if (document.activeElement === noteInput) {
-          // 允许换行，不阻止默认行为
-          return;
-        }
+        e.preventDefault();
+        ipcRenderer.send('open-dashboard');
+        ipcRenderer.send('hide-capture-window');
+        return;
       }
 
-      // Enter 键保存
-      if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault(); // 阻止默认行为
+      // Enter 键保存（备注框中允许 Shift+Enter 换行）
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
         saveAndClose();
       }
 
@@ -334,21 +585,36 @@
     saveBtn.addEventListener('click', saveAndClose);
 
     async function saveAndClose() {
-      if (!urlInput.value) return;
+      // 允许没有 URL 但有文件的情况
+      if (!urlInput.value && !pendingFileData) return;
 
       loadingStatus.textContent = '保存中...';
 
       const newItem = {
         id: Date.now().toString(),
-        url: urlInput.value,
-        title: titleInput.value || urlInput.value,
+        url: urlInput.value || '',
+        title: titleInput.value || urlInput.value || '未命名',
         category: categoryInput.value,
         note: noteInput.value,
         image: currentImage,
-        platform: getPlatform(urlInput.value),
+        platform: getPlatformFromMode(modeInput.value, urlInput.value),
         createdAt: new Date().toISOString(),
         pinned: false
       };
+      
+      // 如果有文件数据，添加文件相关字段
+      if (pendingFileData) {
+        if (pendingFileData.type === 'epub') {
+          newItem.hasEpubFile = true;
+          newItem.author = pendingFileData.author;
+        } else if (pendingFileData.type === 'audio') {
+          newItem.hasAudioFile = true;
+        }
+        newItem.fileName = pendingFileData.fileName;
+        newItem.fileSize = pendingFileData.fileSize;
+        // 将文件数据转为 base64 存储
+        newItem.fileData = arrayBufferToBase64(pendingFileData.data);
+      }
 
       await ipcRenderer.invoke('save-item', newItem);
 
@@ -364,16 +630,55 @@
       urlInput.value = '';
       titleInput.value = '';
       noteInput.value = '';
+      modeInput.value = 'video';
       imagePreview.style.display = 'none';
       currentImage = '';
       loadingStatus.textContent = '';
+      pendingFileData = null;
+      // 重置拖拽区域
+      dropZone.style.display = '';
+      dropZone.classList.remove('has-file');
+      dropZone.innerHTML = `
+        <div class="file-drop-icon">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13"/>
+          </svg>
+        </div>
+        <div class="file-drop-text">拖拽文件到这里添加</div>
+        <div class="file-drop-hint">支持 EPUB、MP3、WAV 等</div>
+        <input type="file" id="fileInput" accept=".epub,audio/*" style="display: none;">
+      `;
     }
 
-    function getPlatform(url) {
-      if (!url) return 'Web';
-      if (url.includes('twitter.com') || url.includes('x.com')) return 'Twitter';
-      if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube';
-      return 'Web';
+    // 根据链接自动检测模式
+    function autoDetectMode(url) {
+      if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('bilibili.com')) {
+        modeInput.value = 'video';
+      } else if (url.includes('arxiv.org') || url.includes('scholar.google')) {
+        modeInput.value = 'paper';
+      } else {
+        modeInput.value = 'web';
+      }
+    }
+
+    function getPlatformFromMode(mode, url) {
+      if (mode === 'book') return 'Book';
+      if (mode === 'paper') return 'Paper';
+      if (mode === 'audio') return 'Audio';
+      if (mode === 'web') return 'Web';
+      // video 模式下根据 URL 细分
+      if (url?.includes('youtube.com') || url?.includes('youtu.be')) return 'YouTube';
+      if (url?.includes('bilibili.com')) return 'Bilibili';
+      return 'Video';
+    }
+
+    function arrayBufferToBase64(buffer) {
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
     }
   </script>
 </body>
