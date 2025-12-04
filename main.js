@@ -199,12 +199,15 @@ function startLocalServer() {
   }
 }
 
+let mainWindowPinned = false; // 主窗口置顶状态
+let captureWindowPinned = false; // Capture 窗口置顶状态
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 800,
     show: false,
-    alwaysOnTop: true,
+    alwaysOnTop: false, // 默认不置顶
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -217,12 +220,18 @@ function createMainWindow() {
   // 设置在所有工作区可见（包括全屏应用）
   try {
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
   } catch (_) { }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // 失去焦点时隐藏（仅在非置顶状态）
+  mainWindow.on('blur', () => {
+    if (!mainWindowPinned && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.hide();
+    }
   });
 
   mainWindow.on('close', (event) => {
@@ -252,14 +261,16 @@ function createCaptureWindow() {
 
   captureWindow.loadFile('capture.html');
 
-  // 失去焦点时隐藏（但忽略刚显示后的短暂失焦）
+  // 失去焦点时隐藏（但忽略刚显示后的短暂失焦，以及置顶状态）
   captureWindow.on('blur', () => {
+    if (captureWindowPinned) return; // 置顶时不隐藏
+    
     const elapsed = Date.now() - lastShowAt;
     if (elapsed < 800) return; // 忽略刚显示后的短暂失焦
 
     setTimeout(() => {
       try {
-        if (captureWindow && !captureWindow.isDestroyed() && !captureWindow.isFocused()) {
+        if (captureWindow && !captureWindow.isDestroyed() && !captureWindow.isFocused() && !captureWindowPinned) {
           captureWindow.hide();
         }
       } catch (err) { }
@@ -430,6 +441,48 @@ ipcMain.handle('update-item', (event, id, updates) => {
 
 ipcMain.handle('read-clipboard', () => {
   return clipboard.readText();
+});
+
+// 导出数据到文件
+ipcMain.handle('export-data', async (event, { defaultName, data }) => {
+  try {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: '导出数据',
+      defaultPath: defaultName,
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+    
+    const fs = require('fs');
+    fs.writeFileSync(filePath, data, 'utf-8');
+    return { success: true, path: filePath };
+  } catch (e) {
+    console.error('导出失败:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// 置顶窗口相关
+ipcMain.handle('get-always-on-top', () => {
+  return mainWindowPinned;
+});
+
+ipcMain.handle('toggle-always-on-top', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  mainWindowPinned = !mainWindowPinned;
+  mainWindow.setAlwaysOnTop(mainWindowPinned, mainWindowPinned ? 'screen-saver' : 'normal');
+  return mainWindowPinned;
+});
+
+// Capture 窗口置顶
+ipcMain.handle('toggle-capture-always-on-top', () => {
+  if (!captureWindow || captureWindow.isDestroyed()) return false;
+  captureWindowPinned = !captureWindowPinned;
+  // Capture 窗口置顶时不会因失去焦点而隐藏
+  return captureWindowPinned;
 });
 
 ipcMain.handle('fetch-metadata', async (event, url) => {

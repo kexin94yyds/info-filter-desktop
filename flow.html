@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flow - 学习空间</title>
+  <title>Flow</title>
   <style>
     * {
       margin: 0;
@@ -59,7 +59,7 @@
     }
 
     .mode-btn.active {
-      background: #000;
+      background: #1f2937;
       color: #fff;
     }
 
@@ -85,16 +85,19 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      -webkit-app-region: drag;
     }
 
     .header h1 {
       font-size: 20px;
       font-weight: 700;
+      user-select: none;
     }
 
     .header-actions {
       display: flex;
       gap: 8px;
+      -webkit-app-region: no-drag;
     }
 
     .header-btn {
@@ -120,6 +123,37 @@
 
     .header-btn.primary:hover {
       background: #1d4ed8;
+    }
+
+    /* 置顶按钮 */
+    .pin-btn {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .pin-btn:hover {
+      background: #f3f4f6;
+    }
+    .pin-btn.active {
+      background: #1f2937;
+      border-color: #1f2937;
+    }
+    .pin-btn.active svg {
+      stroke: #fff;
+    }
+    .pin-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke: #6b7280;
+      transform: rotate(45deg);
     }
 
     /* 内容区域 */
@@ -149,6 +183,51 @@
     .media-title {
       font-weight: 600;
       font-size: 15px;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px 12px;
+      gap: 8px;
+      flex: 1;
+      max-width: 400px;
+      margin: 0 16px;
+    }
+
+    .search-icon {
+      color: #9ca3af;
+      flex-shrink: 0;
+    }
+
+    .search-input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 14px;
+      flex: 1;
+      width: 100%;
+    }
+
+    .search-input::placeholder {
+      color: #9ca3af;
+    }
+
+    .clear-search-btn {
+      border: none;
+      background: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+
+    .clear-search-btn:hover {
+      color: #6b7280;
     }
 
     .media-grid {
@@ -349,6 +428,19 @@
 
     .media-card-btn.edit:hover {
       background: #dbeafe;
+    }
+
+    .media-card-btn.pin {
+      color: #f59e0b;
+    }
+
+    .media-card-btn.pin:hover {
+      background: #fef3c7;
+    }
+
+    .media-card-btn.pin.active {
+      color: #fff;
+      background: #f59e0b;
     }
 
     .media-card-btn.delete {
@@ -819,7 +911,20 @@
     <main class="main-content">
       <header class="header">
         <h1 id="modeTitle">视频学习</h1>
+        <div class="search-box">
+          <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="text" id="searchInput" placeholder="搜索内容..." class="search-input">
+          <button class="clear-search-btn" id="clearSearchBtn" style="display: none;">×</button>
+        </div>
         <div class="header-actions">
+          <button class="pin-btn" id="pinBtn" title="置顶窗口">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" x2="12" y1="17" y2="22"></line>
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+            </svg>
+          </button>
           <button class="header-btn" id="exportBtn" title="导出数据">
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 4px;">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>

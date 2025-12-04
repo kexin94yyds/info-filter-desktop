@@ -45,9 +45,11 @@
   const contentAddBtn = document.getElementById('contentAddBtn');
 
   const addContentBtn = document.getElementById('addContentBtn');
+  const pinBtn = document.getElementById('pinBtn');
 
   let currentNoteId = null;
   let currentEditId = null;
+  let searchQuery = '';  // 搜索关键词
 
   // 模式配置
   const modeConfig = {
@@ -66,6 +68,12 @@
     bindEvents();
     updateURLMode();
     render();
+    
+    // 自动聚焦搜索框
+    setTimeout(() => {
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) searchInput.focus();
+    }, 100);
   }
 
   // 加载数据
@@ -369,6 +377,86 @@
         e.target.value = '';
       }
     });
+
+    // 置顶按钮
+    if (pinBtn && ipcRenderer) {
+      // 初始化置顶状态
+      ipcRenderer.invoke('get-always-on-top').then(isPinned => {
+        if (isPinned) pinBtn.classList.add('active');
+      }).catch(() => {});
+      
+      pinBtn.addEventListener('click', async () => {
+        try {
+          const isPinned = await ipcRenderer.invoke('toggle-always-on-top');
+          pinBtn.classList.toggle('active', isPinned);
+          pinBtn.title = isPinned ? '取消置顶' : '置顶窗口';
+        } catch (e) {
+          console.error('切换置顶失败:', e);
+        }
+      });
+    }
+
+    // 键盘导航：Tab 切换模式（全局生效，包括搜索框）
+    document.addEventListener('keydown', (e) => {
+      // Tab 键切换模式
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        switchToNextMode(e.shiftKey);
+      }
+    });
+
+    // 搜索功能
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.trim();
+        clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
+        render();
+      });
+      
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          clearSearch();
+        }
+      });
+    }
+    
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener('click', clearSearch);
+    }
+  }
+
+  // 清除搜索
+  function clearSearch() {
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    if (searchInput) {
+      searchInput.value = '';
+      searchQuery = '';
+      clearSearchBtn.style.display = 'none';
+      render();
+    }
+  }
+
+  // Tab 切换到下一个模式
+  function switchToNextMode(reverse = false) {
+    const modes = ['video', 'book', 'paper', 'audio', 'web'];
+    const currentIndex = modes.indexOf(flowData.currentMode);
+    
+    let nextIndex;
+    if (reverse) {
+      // Shift+Tab 向上
+      nextIndex = currentIndex - 1;
+      if (nextIndex < 0) nextIndex = modes.length - 1;
+    } else {
+      // Tab 向下
+      nextIndex = currentIndex + 1;
+      if (nextIndex >= modes.length) nextIndex = 0;
+    }
+    
+    switchMode(modes[nextIndex]);
   }
 
   // 切换模式
@@ -397,7 +485,25 @@
   // 渲染媒体卡片网格
   function renderMedia() {
     const mode = flowData.currentMode;
-    const contents = flowData.contents[mode] || [];
+    let contents = flowData.contents[mode] || [];
+
+    // 搜索过滤
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      contents = contents.filter(content => {
+        const title = (content.title || '').toLowerCase();
+        const note = (content.note || '').toLowerCase();
+        const platform = (content.platform || '').toLowerCase();
+        return title.includes(query) || note.includes(query) || platform.includes(query);
+      });
+    }
+    
+    // 排序：置顶的在前，然后按创建时间降序
+    contents.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
 
     // 更新标题
     const titleMap = {
@@ -408,7 +514,7 @@
     mediaTitle.textContent = titleMap[mode] || '内容列表';
 
     if (contents.length === 0) {
-      renderMediaPlaceholder();
+      renderMediaPlaceholder(searchQuery ? '未找到匹配内容' : null);
       return;
     }
 
@@ -419,9 +525,9 @@
     mediaGrid.querySelectorAll('.media-card').forEach(card => {
       const id = card.dataset.id;
       card.querySelector('.media-card-thumb').addEventListener('click', () => openContent(id));
-      card.querySelector('.media-card-btn.edit')?.addEventListener('click', (e) => {
+      card.querySelector('.media-card-btn.pin')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        editContent(id);
+        togglePin(id);
       });
       card.querySelector('.media-card-btn.delete')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -558,7 +664,7 @@
         <div class="media-card-footer">
           <span>${formatDate(content.createdAt)}</span>
           <div class="media-card-actions">
-            <button class="media-card-btn edit">编辑</button>
+            <button class="media-card-btn pin ${content.pinned ? 'active' : ''}">${content.pinned ? '已置顶' : '置顶'}</button>
             <button class="media-card-btn delete">删除</button>
           </div>
         </div>
@@ -606,11 +712,15 @@
   }
 
   // 渲染空状态
-  function renderMediaPlaceholder() {
+  function renderMediaPlaceholder(customMsg) {
     const mode = flowData.currentMode;
     let icon, text;
 
-    if (mode === 'video') {
+    if (customMsg) {
+      // 搜索无结果
+      icon = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>`;
+      text = customMsg;
+    } else if (mode === 'video') {
       icon = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>`;
       text = '点击右上角"添加内容"添加视频';
@@ -757,6 +867,19 @@
       saveData();
       render();
     }
+  }
+
+  // 置顶/取消置顶内容
+  async function togglePin(id) {
+    const mode = flowData.currentMode;
+    const content = flowData.contents[mode]?.find(c => c.id === id);
+    if (!content) return;
+    
+    content.pinned = !content.pinned;
+    content.pinnedAt = content.pinned ? Date.now() : null;
+    
+    await saveData();
+    render();
   }
 
   // 删除内容
@@ -1403,18 +1526,34 @@
         files: files
       };
       
-      const json = JSON.stringify(exportObj);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `flow-data-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const json = JSON.stringify(exportObj, null, 2);
       
-      alert('导出成功！');
+      if (ipcRenderer) {
+        // Electron 环境：使用保存对话框
+        const result = await ipcRenderer.invoke('export-data', {
+          defaultName: `flow-data-${new Date().toISOString().split('T')[0]}.json`,
+          data: json
+        });
+        if (result.success) {
+          alert('导出成功！文件已保存到: ' + result.path);
+        } else if (result.canceled) {
+          // 用户取消，不显示提示
+        } else {
+          alert('导出失败');
+        }
+      } else {
+        // 浏览器环境：使用下载链接
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `flow-data-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert('导出成功！');
+      }
     } catch (e) {
       console.error('导出失败:', e);
       alert('导出失败');

@@ -64,10 +64,22 @@
     /* 拖动区域 */
     .drag-handle {
       -webkit-app-region: drag;
-      height: 20px;
-      margin-bottom: 10px;
+      height: 40px;
+      margin-bottom: 8px;
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .drag-handle h2 {
+      -webkit-app-region: drag;
+      user-select: none;
+      margin: 0;
+      font-size: 16px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .close-btn {
@@ -82,15 +94,6 @@
 
     .close-btn:hover {
       color: #333;
-    }
-
-    h2 {
-      margin: 0 0 16px 0;
-      font-size: 16px;
-      color: #333;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
     input,
@@ -282,6 +285,38 @@
       font-size: 11px;
       color: #6b7280;
     }
+
+    /* 置顶按钮 */
+    .pin-btn {
+      -webkit-app-region: no-drag;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .pin-btn:hover {
+      background: #f3f4f6;
+    }
+    .pin-btn.active {
+      background: #1f2937;
+      border-color: #1f2937;
+    }
+    .pin-btn.active svg {
+      stroke: #fff;
+    }
+    .pin-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: #6b7280;
+      transform: rotate(45deg);
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
@@ -294,19 +329,21 @@
 
   <div class="container">
     <div class="drag-handle">
-      <button class="close-btn" id="closeBtn">×</button>
+      <h2>
+        <span id="statusIcon">✨</span>
+        <span id="statusText">添加新内容</span>
+      </h2>
+      <button class="pin-btn" id="pinBtn" title="置顶窗口">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" x2="12" y1="17" y2="22"></line>
+          <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+        </svg>
+      </button>
     </div>
-    <h2>
-      <span id="statusIcon">✨</span>
-      <span id="statusText">添加新内容</span>
-    </h2>
 
     <div class="content-area">
+      <!-- 图片预览/文件拖拽区域 -->
       <div id="imagePreview"><img src=""></div>
-
-      <input type="text" id="url" placeholder="链接 (Cmd+V 或自动读取)" autofocus>
-      
-      <!-- 文件拖拽区域 -->
       <div id="dropZone" class="file-drop-zone">
         <div class="file-drop-icon">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,7 +354,8 @@
         <div class="file-drop-hint">支持 EPUB、MP3、WAV 等</div>
         <input type="file" id="fileInput" accept=".epub,audio/*" style="display: none;">
       </div>
-      
+
+      <input type="text" id="url" placeholder="链接 (Cmd+V 或自动读取)" autofocus>
       <input type="text" id="title" placeholder="标题">
 
       <div style="display: flex; gap: 10px;">
@@ -568,8 +606,16 @@
       }
     });
 
-    document.getElementById('closeBtn').addEventListener('click', () => {
-      ipcRenderer.send('hide-capture-window');
+    // 置顶按钮
+    const pinBtn = document.getElementById('pinBtn');
+    pinBtn.addEventListener('click', async () => {
+      try {
+        const isPinned = await ipcRenderer.invoke('toggle-capture-always-on-top');
+        pinBtn.classList.toggle('active', isPinned);
+        pinBtn.title = isPinned ? '取消置顶' : '置顶窗口';
+      } catch (e) {
+        console.error('切换置顶失败:', e);
+      }
     });
 
     const openDashboardBtn = document.getElementById('openDashboardBtn');
