@@ -1219,7 +1219,9 @@
     if (!supabaseClient || !SUPABASE_BUCKET) {
       throw new Error('Supabase 未配置');
     }
-    const path = `${folder}/${id}-${encodeURIComponent(file.name)}`;
+    // 只用 id + 扩展名，避免中文/特殊字符导致 InvalidKey 错误
+    const ext = file.name.split('.').pop() || 'bin';
+    const path = `${folder}/${id}.${ext}`;
     const { error } = await supabaseClient.storage.from(SUPABASE_BUCKET).upload(path, file, {
       cacheControl: '3600',
       upsert: true
