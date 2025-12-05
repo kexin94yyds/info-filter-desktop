@@ -1922,8 +1922,12 @@
       const text = await file.text();
       const importObj = JSON.parse(text);
       
-      // 支持多种格式
-      if (!importObj.items && !importObj.flowData) {
+      // 支持多种格式：
+      // 1. 纯数组 [...] （App 导出格式）
+      // 2. { items: [...] }
+      // 3. { flowData: {...} }（旧格式）
+      const isArray = Array.isArray(importObj);
+      if (!isArray && !importObj.items && !importObj.flowData) {
         alert('无效的数据文件');
         return;
       }
@@ -1932,10 +1936,14 @@
         return;
       }
       
-      // 优先使用 items 格式
-      if (importObj.items) {
+      // 优先使用数组或 items 格式
+      if (isArray) {
+        // App 导出的纯数组格式
+        items = importObj;
+        await itemsToFlowData();
+      } else if (importObj.items) {
         items = importObj.items;
-        itemsToFlowData();
+        await itemsToFlowData();
       } else if (importObj.flowData) {
         // 兼容旧格式
         flowData.contents = importObj.flowData.contents || { video: [], book: [], paper: [], audio: [] };
