@@ -1,427 +1,50 @@
 <!DOCTYPE html>
 <html lang="zh">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#000000">
-  <title>我的信息过滤器</title>
+  <meta http-equiv="refresh" content="0; url=flow.html">
   <link rel="manifest" href="manifest.json">
+  <title>信息过滤器 · Flow</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f3f4f6;
-      margin: 0;
+      background: #f3f4f6;
       color: #1f2937;
-      padding-bottom: env(safe-area-inset-bottom);
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px 16px;
-    }
-
-    header {
+      height: 100vh;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-      gap: 12px;
+      justify-content: center;
     }
-
-    h1 {
-      font-size: 24px;
-      font-weight: 800;
-      color: #111827;
-      margin: 0;
-    }
-
-    .controls {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      flex: 1;
-      justify-content: flex-end;
-    }
-
-    .filter-btn {
-      background: white;
-      border: 1px solid #e5e7eb;
-      padding: 8px 14px;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 13px;
-      color: #4b5563;
-      transition: all 0.2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .filter-btn.active {
-      background: #000;
-      color: white;
-      border-color: #000;
-    }
-
-    .add-btn {
+    .wrapper { text-align: center; line-height: 1.6; }
+    .btn {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 10px 16px;
       background: #2563eb;
       color: white;
-      border: none;
-      padding: 10px 20px;
       border-radius: 8px;
-      cursor: pointer;
-      font-weight: 500;
-      font-size: 14px;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-      align-items: start;
-    }
-
-    @media (max-width: 640px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-      header {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .controls {
-        justify-content: stretch;
-      }
-
-      .filter-btn {
-        flex: 1;
-        text-align: center;
-      }
-    }
-
-    .card {
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      transition: transform 0.2s;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      cursor: grab;
-    }
-
-    .card:active {
-      cursor: grabbing;
-    }
-
-    .card.pinned {
-      border: 2px solid #fbbf24;
-    }
-
-    .pin-icon {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(255, 255, 255, 0.9);
-      border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.2s;
-      z-index: 10;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .card:hover .pin-icon,
-    .card.pinned .pin-icon {
-      opacity: 1;
-    }
-
-    .card.pinned .pin-icon {
-      background: #fbbf24;
-      color: white;
-    }
-
-    .card-content {
-      padding: 16px;
-      flex-grow: 1;
-    }
-
-    .card-meta {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 12px;
-      color: #6b7280;
-    }
-
-    .platform-tag {
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: #f3f4f6;
-      font-weight: 500;
-    }
-
-    .platform-Twitter {
-      background: #eff6ff;
-      color: #1d4ed8;
-    }
-
-    .platform-YouTube {
-      background: #fef2f2;
-      color: #b91c1c;
-    }
-
-    .card-title {
-      font-size: 16px;
-      font-weight: 600;
-      margin: 0 0 8px 0;
-      line-height: 1.4;
-    }
-
-    .card-title a {
-      color: #111827;
       text-decoration: none;
-    }
-
-    .card-note {
       font-size: 14px;
-      color: #4b5563;
-      background: #f9fafb;
-      padding: 8px;
-      border-radius: 6px;
-      margin-top: 8px;
-    }
-
-    .card-footer {
-      padding: 12px 16px;
-      background: #f9fafb;
-      border-top: 1px solid #f3f4f6;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .date {
-      font-size: 12px;
-      color: #9ca3af;
-    }
-
-    .delete-btn {
-      color: #ef4444;
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 12px;
-      padding: 6px 12px;
-      border-radius: 4px;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .sortable-ghost {
-      opacity: 0.4;
-    }
-
-    .sortable-drag {
-      opacity: 0.85;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    }
-
-    .empty-state {
-      grid-column: 1 / -1;
-      text-align: center;
-      padding: 60px 20px;
-      color: #6b7280;
-    }
-
-    /* 添加内容弹窗 */
-    #addModal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-      padding: 20px;
-      overflow-y: auto;
-    }
-
-    #addModal.show {
-      display: flex;
-    }
-
-    .modal-content {
-      background: white;
-      padding: 24px;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 500px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-
-    .modal-title {
-      font-size: 18px;
-      font-weight: bold;
-      margin-bottom: 16px;
-    }
-
-    .form-group {
-      margin-bottom: 12px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 12px;
-      font-weight: 500;
-      margin-bottom: 4px;
-      color: #374151;
-    }
-
-    .form-group input,
-    .form-group textarea,
-    .form-group select {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      box-sizing: border-box;
-      font-size: 14px;
-    }
-
-    #imagePreview {
-      margin-top: 8px;
-      margin-bottom: 16px;
-      display: none;
-      border-radius: 8px;
-      overflow: hidden;
-      position: relative;
-      background: #f3f4f6;
-      max-height: 220px;
-      min-height: 180px;
-    }
-
-    #imagePreview img {
-      width: 100%;
-      height: 200px;
-      object-fit: cover;
-      display: block;
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .btn-cancel,
-    .btn-save {
-      padding: 10px 20px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-size: 14px;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .btn-cancel {
-      background: #f3f4f6;
-      color: #374151;
-    }
-
-    .btn-save {
-      background: #000;
-      color: white;
     }
   </style>
+  <script>
+    (function() {
+      var target = 'flow.html' + (window.location.search || '') + (window.location.hash || '');
+      try {
+        window.location.replace(target);
+      } catch (e) {
+        window.location.href = target;
+      }
+    })();
+  </script>
 </head>
-
 <body>
-  <div class="container">
-    <header>
-      <h1>我的信息流</h1>
-      <div class="controls" id="filters">
-        <button class="filter-btn active" data-filter="all">全部</button>
-        <button class="filter-btn" data-filter="Twitter">Twitter</button>
-        <button class="filter-btn" data-filter="YouTube">YouTube</button>
-        <button class="filter-btn" data-filter="Web">网页</button>
-      </div>
-      <div class="actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="add-btn" id="exportBtn" style="background: #4b5563;">导出</button>
-        <button class="add-btn" id="importBtn" style="background: #4b5563;">导入</button>
-        <input type="file" id="importFile" style="display: none" accept=".json">
-        <button id="showAddModalBtn" class="add-btn">+ 添加</button>
-      </div>
-    </header>
-
-    <div id="grid" class="grid"></div>
+  <div class="wrapper">
+    <p>正在跳转到新版 Flow 界面...</p>
+    <a class="btn" href="flow.html">如果没有自动跳转，点击这里</a>
   </div>
-
-  <!-- 添加内容弹窗 -->
-  <div id="addModal">
-    <div class="modal-content">
-      <div class="modal-title">添加新内容</div>
-
-      <div id="imagePreview"><img src=""></div>
-
-      <div class="form-group">
-        <label>链接</label>
-        <input type="text" id="inputUrl" placeholder="https://...">
-      </div>
-
-      <div class="form-group">
-        <label>标题</label>
-        <input type="text" id="inputTitle" placeholder="输入标题...">
-      </div>
-
-      <div class="form-group">
-        <label>分类</label>
-        <select id="inputCategory">
-          <option value="read_later">稍后阅读</option>
-          <option value="learning">学习资料</option>
-          <option value="inspiration">灵感</option>
-          <option value="entertainment">娱乐</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>笔记</label>
-        <textarea id="inputNote" rows="3" placeholder="备注..."></textarea>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn-cancel" id="cancelAddBtn">取消</button>
-        <button class="btn-save" id="confirmAddBtn">保存</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
-  <script src="web-api.js"></script>
-  <script src="web-dashboard.js"></script>
 </body>
-
 </html>
