@@ -704,6 +704,7 @@
     const thumbHtml = getThumbHtml(content, mode);
     const notes = flowData.notes[mode]?.[content.id] || [];
     const hasThumb = thumbHtml.includes('<img');
+    const hasCloudFile = (mode === 'book' && !!content.fileUrl) || (mode === 'audio' && !!content.fileUrl);
 
     // 根据模式显示不同图标
     const iconSvg = mode === 'book' 
@@ -718,7 +719,7 @@
 
     return `
       <div class="media-card" data-id="${content.id}">
-        <div class="media-card-thumb ${hasThumb ? 'has-thumb' : ''}" draggable="${content.hasEpubFile || content.hasAudioFile ? 'true' : 'false'}" data-has-file="${content.hasEpubFile || content.hasAudioFile ? 'true' : 'false'}" data-file-name="${content.fileName || ''}">
+        <div class="media-card-thumb ${hasThumb ? 'has-thumb' : ''}" draggable="${hasCloudFile ? 'true' : 'false'}" data-has-file="${hasCloudFile ? 'true' : 'false'}" data-file-name="${content.fileName || ''}">
           ${thumbHtml}
           <div class="media-card-play ${hasThumb ? 'overlay' : ''}">
             ${iconSvg}
@@ -862,7 +863,7 @@
         window.open(content.fileUrl, '_blank');
         return;
       }
-      alert('未找到书籍文件，请重新上传以生成云端链接');
+      alert('当前书籍缺少云端链接，请重新上传生成链接');
       return;
     }
     
