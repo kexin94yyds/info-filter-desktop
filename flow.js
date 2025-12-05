@@ -43,7 +43,7 @@
 
   // Supabase 配置（使用 anon key + 公共 bucket）
   const SUPABASE_URL = 'https://pgnxluovitiwgvzutjuh.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnbnhsdW92aXRpd2d2enV0anVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM1NTY5MTIsImV4cCI6MjA0OTEzMjkxMn0.IxrJYrUTP_Dk9LSfy5Nt1puNLj2p7dZC_F2GKGxtIHU';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnbnhsdW92aXRpd2d2enV0anVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MDI2OTUsImV4cCI6MjA4MDQ3ODY5NX0.jnhAqNfnS_3trkbxEzQyPZG8omRejsdXpj7GCBoU9m0';
   const SUPABASE_BUCKET = 'flow-files';
   const supabaseClient = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
