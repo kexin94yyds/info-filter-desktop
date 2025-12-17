@@ -30,3 +30,7 @@ Thumbs.db
 *.tmp
 .cache/
 
+# cunzhi 知识库（独立仓库）
+.cunzhi-knowledge/
+.cunzhi-memory/
+
