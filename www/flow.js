@@ -2196,6 +2196,7 @@
     captureModal.classList.add('show');
     
     // 自动获取标题和图片
+    const captureDropZone = document.getElementById('captureDropZone');
     fetchMetadata(url).then(metadata => {
       console.log('📋 获取到元数据:', metadata);
       if (metadata.title && captureTitleInput) {
@@ -2206,6 +2207,10 @@
         if (img) {
           img.src = metadata.image;
           captureImagePreview.style.display = 'block';
+          // 隐藏拖拽区域
+          if (captureDropZone) {
+            captureDropZone.style.display = 'none';
+          }
         }
       }
     }).catch(e => console.log('获取元数据失败:', e));
