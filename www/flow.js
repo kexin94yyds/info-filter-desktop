@@ -2175,6 +2175,7 @@
     const captureUrlInput = document.getElementById('captureUrlInput');
     const captureTitleInput = document.getElementById('captureTitleInput');
     const captureModeSelect = document.getElementById('captureModeSelect');
+    const captureImagePreview = document.getElementById('captureImagePreview');
     
     if (!captureModal || !captureUrlInput) {
       console.log('❌ capture 弹窗元素不存在');
@@ -2194,12 +2195,20 @@
     // 打开弹窗
     captureModal.classList.add('show');
     
-    // 自动获取标题
+    // 自动获取标题和图片
     fetchMetadata(url).then(metadata => {
+      console.log('📋 获取到元数据:', metadata);
       if (metadata.title && captureTitleInput) {
         captureTitleInput.value = metadata.title;
       }
-    }).catch(e => console.log('获取标题失败:', e));
+      if (metadata.image && captureImagePreview) {
+        const img = captureImagePreview.querySelector('img');
+        if (img) {
+          img.src = metadata.image;
+          captureImagePreview.style.display = 'block';
+        }
+      }
+    }).catch(e => console.log('获取元数据失败:', e));
   }
   
   // 暴露给 iOS 原生调用的函数
